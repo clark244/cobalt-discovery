@@ -203,6 +203,10 @@ export default function App() {
   const [generating, setGenerating] = useState(false);
   const [deliverable, setDeliverable] = useState(null);
   const [error, setError] = useState("");
+  const [reviewer, setReviewer] = useState("");      // reviewer name/initials
+  const [started, setStarted] = useState(false);     // false until name entered
+  const [nameInput, setNameInput] = useState("");
+  const [sessionId] = useState(() => "s_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -232,6 +236,26 @@ export default function App() {
     }
   };
 
+  // Silently persist the full session to the Google Sheet (fire-and-forget).
+  const saveSession = async (model) => {
+    try {
+      await fetch("/.netlify/functions/save-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          reviewer,
+          timestamp: new Date().toISOString(),
+          messageCount: messages.length,
+          transcript: messages.map((m) => `${m.role === "user" ? "FOUNDER" : "GUIDE"}: ${m.content}`).join("\n\n"),
+          model,
+        }),
+      });
+    } catch (e) {
+      /* never block the user on a logging failure */
+    }
+  };
+
   const generate = async () => {
     setGenerating(true);
     setError("");
@@ -241,6 +265,8 @@ export default function App() {
       const clean = raw.replace(/```json/g, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(clean.slice(clean.indexOf("{"), clean.lastIndexOf("}") + 1));
       setDeliverable(parsed);
+      saveSession(parsed); // observability: log the full session for reviewer feedback
+
     } catch (e) {
       setError("Couldn't assemble the model — try generating once more.");
     } finally {
@@ -254,6 +280,8 @@ export default function App() {
     setDeliverable(null);
     setError("");
     setInput("");
+    setStarted(false);
+    setNameInput("");
   };
 
   return (
@@ -272,6 +300,34 @@ export default function App() {
           )}
         </div>
 
+        {!started ? (
+          <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
+            <CobaltLogo size={48} />
+            <h2 className="mt-4 text-lg font-bold" style={{ color: INK }}>Cobalt Impact Discovery</h2>
+            <p className="mt-2 text-sm max-w-sm" style={{ color: "#6B7280" }}>
+              A short conversation to map how your product creates impact — and where measuring it could help most. Takes about 5–10 minutes.
+            </p>
+            <p className="mt-4 text-[13px] max-w-sm" style={{ color: "#9CA3AF" }}>
+              You're part of an invited review group. Your name just helps us follow up on your feedback.
+            </p>
+            <input
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && nameInput.trim()) { setReviewer(nameInput.trim()); setStarted(true); } }}
+              placeholder="Your name or initials"
+              className="mt-4 w-full max-w-xs rounded-xl border border-slate-200 px-3 py-2.5 text-[14px] text-center focus:outline-none focus:ring-2"
+              style={{ color: INK }}
+            />
+            <button
+              onClick={() => { if (nameInput.trim()) { setReviewer(nameInput.trim()); setStarted(true); } }}
+              disabled={!nameInput.trim()}
+              className="mt-3 px-6 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-40"
+              style={{ background: COBALT }}
+            >
+              Start →
+            </button>
+          </div>
+        ) : (
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 space-y-3">
           {!deliverable && messages.map((m, i) => (
             <div key={i} className={`flex ${m.role === "user" ? "justify-end pl-10" : "justify-start pr-10"}`}>
@@ -310,8 +366,9 @@ export default function App() {
 
           {error && <div className="text-center text-xs" style={{ color: AMBER }}>{error}</div>}
         </div>
+        )}
 
-        {!deliverable && !generating && (
+        {started && !deliverable && !generating && (
           <div className="border-t border-slate-100 p-3">
             {ready && <p className="text-[11px] text-center mb-2" style={{ color: "#9CA3AF" }}>Want to add anything else before generating? Keep typing, or hit the button above.</p>}
             <div className="flex items-end gap-2">
