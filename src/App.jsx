@@ -194,31 +194,49 @@ function Deliverable({ d }) {
     // Impact Process Model
     text("Draft Impact Process Model", margin, { size: 13, color: INK_RGB, style: "bold" });
     gap(4);
-    text("● Understood    ● Assumed / untested", margin, { size: 8, color: GRAY_RGB });
+    // Legend with drawn circles (Helvetica can't render ● reliably).
+    const legendBaseY = y;
+    doc.setFillColor(COBALT_RGB[0], COBALT_RGB[1], COBALT_RGB[2]);
+    doc.circle(margin + 3, legendBaseY - 3, 2.5, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(GRAY_RGB[0], GRAY_RGB[1], GRAY_RGB[2]);
+    doc.text("Understood", margin + 10, legendBaseY);
+    doc.setFillColor(AMBER_RGB[0], AMBER_RGB[1], AMBER_RGB[2]);
+    doc.circle(margin + 95, legendBaseY - 3, 2.5, "F");
+    doc.text("Assumed / untested", margin + 102, legendBaseY);
+    y += 8 * 1.35;
     gap(8);
     const chainNodes = [
       ["PRODUCT", m.product],
-      ["→ " + (m.implementationMechanism?.label || ""), null],
+      [m.implementationMechanism?.label || "", null],
       ["USER BEHAVIOR", m.userBehavior],
-      ["→ " + (m.interventionMechanism?.label || ""), null],
+      [m.interventionMechanism?.label || "", null],
       ["OUTCOME", m.outcome],
     ];
     chainNodes.forEach(([label, node]) => {
       if (node === null) {
-        text(label, margin + 10, { size: 9, color: GRAY_RGB, style: "italic" });
+        // Mechanism connector: small drawn triangle + wrapped italic text within margins.
+        ensureSpace(14);
+        doc.setFillColor(GRAY_RGB[0], GRAY_RGB[1], GRAY_RGB[2]);
+        const ty = y - 3;
+        doc.triangle(margin + 8, ty - 2.5, margin + 8, ty + 2.5, margin + 12, ty, "F");
+        text(label, margin + 18, { size: 9, color: GRAY_RGB, style: "italic", maxW: contentW - 18 });
         gap(3);
       } else {
         const c = node?.status === "confirmed" ? COBALT_RGB : AMBER_RGB;
-        ensureSpace(30);
+        ensureSpace(40);
         doc.setDrawColor(c[0], c[1], c[2]);
         doc.setLineWidth(1.2);
-        const boxTop = y - 2;
-        text(label, margin + 8, { size: 7.5, color: c, style: "bold" });
-        gap(1);
-        text(node?.label || "—", margin + 8, { size: 10.5, color: INK_RGB });
-        const boxBottom = y + 2;
+        const boxTop = y;          // top border sits here
+        gap(11);                    // interior top padding: push label down clear of the border
+        text(label, margin + 8, { size: 7.5, color: c, style: "bold", maxW: contentW - 16 });
+        gap(2);
+        text(node?.label || "-", margin + 8, { size: 10.5, color: INK_RGB, maxW: contentW - 16 });
+        gap(7);                     // interior bottom padding
+        const boxBottom = y;
         doc.rect(margin, boxTop, contentW, boxBottom - boxTop);
-        gap(8);
+        gap(9);                     // spacing to next element
       }
     });
     gap(8);
@@ -227,11 +245,11 @@ function Deliverable({ d }) {
     const mat = d.maturity || {};
     text("Maturity", margin, { size: 11, color: INK_RGB, style: "bold" });
     gap(6);
-    text(`Causal model clarity: ${mat.clarity ?? "–"} / 4`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
+    text(`Causal model clarity: ${mat.clarity ?? "-"} / 4`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
     gap(2);
     text(mat.clarityNote || "", margin, { size: 9, color: GRAY_RGB });
     gap(6);
-    text(`Measurement capacity: ${mat.capacity ?? "–"} / 4`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
+    text(`Measurement capacity: ${mat.capacity ?? "-"} / 4`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
     gap(2);
     text(mat.capacityNote || "", margin, { size: 9, color: GRAY_RGB });
     gap(14);
@@ -241,7 +259,7 @@ function Deliverable({ d }) {
     gap(8);
     (d.opportunities || []).forEach((o, i) => {
       ensureSpace(44);
-      const badge = `[${(o.type || "").toUpperCase()} · ${(o.impact || o.lift || "")} impact]`;
+      const badge = `[${(o.type || "").toUpperCase()} - ${(o.impact || o.lift || "")} impact]`;
       text(`${i + 1}. ${o.title}   ${badge}`, margin, { size: 10.5, color: INK_RGB, style: "bold" });
       gap(2);
       text(`"${o.question}"`, margin + 12, { size: 9.5, color: [55, 65, 81], style: "italic", maxW: contentW - 12 });
