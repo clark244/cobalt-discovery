@@ -29,9 +29,36 @@ export default async (req) => {
 
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const sheetId = process.env.GOOGLE_SHEET_ID;
-  let privateKey = process.env.GOOGLE_PRIVATE_KEY || "";
-  // Netlify stores newlines as literal \n; turn them back into real newlines.
-  privateKey = privateKey.replace(/\\n/g, "\n");
+
+  // Robustly normalize the private key regardless of how it was pasted.
+  // Handles: literal \n sequences, double-escaped \\n, surrounding quotes,
+  // Windows \r\n, and a key pasted as one line with spaces between base64.
+  const normalizePrivateKey = (raw) => {
+    let k = raw || "";
+    k = k.trim();
+    // Strip a single pair of wrapping quotes if the whole value is quoted.
+    if ((k.startsWith('"') && k.endsWith('"')) || (k.startsWith("'") && k.endsWith("'"))) {
+      k = k.slice(1, -1);
+    }
+    // Collapse double-escaped, then convert literal \n and \r to real newlines.
+    k = k.replace(/\\\\n/g, "\n").replace(/\\n/g, "\n").replace(/\\r/g, "");
+    k = k.replace(/\r/g, "");
+    // If there are no real newlines at all, rebuild the PEM structure:
+    // put the BEGIN/END markers on their own lines and re-wrap the base64 body.
+    if (!k.includes("\n")) {
+      const m = k.match(/-----BEGIN PRIVATE KEY-----\s*([A-Za-z0-9+/=\s]+?)\s*-----END PRIVATE KEY-----/);
+      if (m) {
+        const body = m[1].replace(/\s+/g, "");
+        const wrapped = body.match(/.{1,64}/g).join("\n");
+        k = `-----BEGIN PRIVATE KEY-----\n${wrapped}\n-----END PRIVATE KEY-----\n`;
+      }
+    }
+    // Ensure a trailing newline (some parsers require it).
+    if (!k.endsWith("\n")) k += "\n";
+    return k;
+  };
+
+  const privateKey = normalizePrivateKey(process.env.GOOGLE_PRIVATE_KEY);
 
   if (!email || !privateKey || !sheetId) {
     return new Response(
