@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { jsPDF } from "jspdf";
 
 // ── Cobalt design system ──
 const COBALT = "#3B82F6";
@@ -145,11 +146,141 @@ function Deliverable({ d }) {
       "\n\n---\nSent from Cobalt's Impact Discovery tool.";
     return `mailto:${COBALT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
+
+  // Generate a clean, laid-out PDF of the deliverable (client-side, no server).
+  const downloadPdf = () => {
+    const doc = new jsPDF({ unit: "pt", format: "letter" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 54;
+    const contentW = pageW - margin * 2;
+    let y = margin;
+
+    const COBALT_RGB = [59, 130, 246];
+    const AMBER_RGB = [217, 119, 6];
+    const INK_RGB = [31, 41, 55];
+    const GRAY_RGB = [107, 114, 128];
+
+    const ensureSpace = (needed) => {
+      if (y + needed > pageH - margin) { doc.addPage(); y = margin; }
+    };
+    const text = (str, x, opts = {}) => {
+      const { size = 10, color = INK_RGB, style = "normal", maxW = contentW, lh = 1.35 } = opts;
+      doc.setFont("helvetica", style);
+      doc.setFontSize(size);
+      doc.setTextColor(color[0], color[1], color[2]);
+      const lines = doc.splitTextToSize(str, maxW);
+      lines.forEach((ln) => {
+        ensureSpace(size * lh);
+        doc.text(ln, x, y);
+        y += size * lh;
+      });
+      return lines.length;
+    };
+    const gap = (h) => { y += h; };
+
+    // Header
+    text("Cobalt Impact Discovery", margin, { size: 9, color: COBALT_RGB, style: "bold" });
+    gap(4);
+    text(d.company && d.company !== "Your product" ? d.company : "Your product", margin, { size: 18, color: INK_RGB, style: "bold" });
+    gap(2);
+    text(new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }), margin, { size: 9, color: GRAY_RGB });
+    gap(6);
+    doc.setDrawColor(COBALT_RGB[0], COBALT_RGB[1], COBALT_RGB[2]);
+    doc.setLineWidth(1);
+    doc.line(margin, y, pageW - margin, y);
+    gap(16);
+
+    // Impact Process Model
+    text("Draft Impact Process Model", margin, { size: 13, color: INK_RGB, style: "bold" });
+    gap(4);
+    text("● Understood    ● Assumed / untested", margin, { size: 8, color: GRAY_RGB });
+    gap(8);
+    const chainNodes = [
+      ["PRODUCT", m.product],
+      ["→ " + (m.implementationMechanism?.label || ""), null],
+      ["USER BEHAVIOR", m.userBehavior],
+      ["→ " + (m.interventionMechanism?.label || ""), null],
+      ["OUTCOME", m.outcome],
+    ];
+    chainNodes.forEach(([label, node]) => {
+      if (node === null) {
+        text(label, margin + 10, { size: 9, color: GRAY_RGB, style: "italic" });
+        gap(3);
+      } else {
+        const c = node?.status === "confirmed" ? COBALT_RGB : AMBER_RGB;
+        ensureSpace(30);
+        doc.setDrawColor(c[0], c[1], c[2]);
+        doc.setLineWidth(1.2);
+        const boxTop = y - 2;
+        text(label, margin + 8, { size: 7.5, color: c, style: "bold" });
+        gap(1);
+        text(node?.label || "—", margin + 8, { size: 10.5, color: INK_RGB });
+        const boxBottom = y + 2;
+        doc.rect(margin, boxTop, contentW, boxBottom - boxTop);
+        gap(8);
+      }
+    });
+    gap(8);
+
+    // Maturity
+    const mat = d.maturity || {};
+    text("Maturity", margin, { size: 11, color: INK_RGB, style: "bold" });
+    gap(6);
+    text(`Causal model clarity: ${mat.clarity ?? "–"} / 4`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
+    gap(2);
+    text(mat.clarityNote || "", margin, { size: 9, color: GRAY_RGB });
+    gap(6);
+    text(`Measurement capacity: ${mat.capacity ?? "–"} / 4`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
+    gap(2);
+    text(mat.capacityNote || "", margin, { size: 9, color: GRAY_RGB });
+    gap(14);
+
+    // Opportunities
+    text("Where measurement could help", margin, { size: 13, color: INK_RGB, style: "bold" });
+    gap(8);
+    (d.opportunities || []).forEach((o, i) => {
+      ensureSpace(44);
+      const badge = `[${(o.type || "").toUpperCase()} · ${(o.impact || o.lift || "")} impact]`;
+      text(`${i + 1}. ${o.title}   ${badge}`, margin, { size: 10.5, color: INK_RGB, style: "bold" });
+      gap(2);
+      text(`"${o.question}"`, margin + 12, { size: 9.5, color: [55, 65, 81], style: "italic", maxW: contentW - 12 });
+      gap(1);
+      text(o.rationale || "", margin + 12, { size: 9, color: GRAY_RGB, maxW: contentW - 12 });
+      gap(8);
+    });
+    gap(6);
+
+    // CTA summary
+    ensureSpace(60);
+    text("Start a conversation with Cobalt", margin, { size: 11, color: COBALT_RGB, style: "bold" });
+    gap(6);
+    text(d.emailSummary || "", margin, { size: 9.5, color: INK_RGB });
+    gap(6);
+    text(`Reach out: ${COBALT_EMAIL}`, margin, { size: 9.5, color: COBALT_RGB, style: "bold" });
+    gap(14);
+    text("This is a draft starting point, not a verdict. Cobalt builds these out with you.", margin, { size: 8, color: GRAY_RGB, style: "italic" });
+
+    const safeName = (d.company && d.company !== "Your product" ? d.company : "impact-model")
+      .replace(/[^a-z0-9]+/gi, "-").toLowerCase().replace(/^-+|-+$/g, "");
+    doc.save(`cobalt-${safeName}.pdf`);
+  };
+
   const m = d.model || {};
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-bold mb-1" style={{ color: INK }}>Draft Impact Process Model</h2>
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="text-lg font-bold mb-1" style={{ color: INK }}>Draft Impact Process Model</h2>
+          <button
+            onClick={downloadPdf}
+            className="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border"
+            style={{ color: COBALT, borderColor: "#BFDBFE", background: "white" }}
+            title="Download a PDF copy to keep"
+          >
+            ⬇ Download PDF
+          </button>
+        </div>
         <p className="text-xs mb-3" style={{ color: "#6B7280" }}>
           <StatusDot status="confirmed" />Understood · <StatusDot status="assumed" />Assumed / untested
         </p>
