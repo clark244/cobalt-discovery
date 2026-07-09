@@ -43,7 +43,7 @@ Maturity (1-4 each, be honest, score the gap not the polish):
 - clarity: 1 outcome only / 2 behavior named, mechanism vague / 3 coherent chain but untested / 4 defined and operationalized.
 - capacity: 1 cannot execute / 2 one binding gap / 3 can execute with support / 4 self-sufficient.
 
-Give 3-5 prioritized measurement opportunities. Each: a plain-English question it answers, type "know" or "prove" (know = evidence that helps the team improve the product; prove = evidence for an external buyer or funder), lift "low"/"medium"/"high", and a one-sentence rationale. Order by usefulness.
+Give 3-5 prioritized measurement opportunities. Each: a plain-English question it answers, type "know" or "prove" (know = evidence that helps the team improve the product; prove = evidence for an external buyer or funder), impact "low"/"medium"/"high" (how much this evidence would matter for the team's most important decisions), and a one-sentence rationale. Order by usefulness.
 
 Keep all text tight. Output ONLY this JSON shape:
 {
@@ -56,7 +56,7 @@ Keep all text tight. Output ONLY this JSON shape:
   "outcome":{"label":"...","status":"confirmed|assumed"}
  },
  "maturity":{"clarity":1,"clarityNote":"one sentence","capacity":1,"capacityNote":"one sentence"},
- "opportunities":[{"title":"...","question":"...","type":"know|prove","lift":"low|medium|high","rationale":"one sentence"}],
+ "opportunities":[{"title":"...","question":"...","type":"know|prove","impact":"low|medium|high","rationale":"one sentence"}],
  "emailSummary":"3-4 sentence plain-text summary the founder could paste into an email to Cobalt to start a conversation."
 }`;
 
@@ -183,7 +183,7 @@ function Deliverable({ d }) {
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <div className="font-semibold text-sm" style={{ color: INK }}>{i + 1}. {o.title}</div>
                 <div className="flex gap-1.5 shrink-0">
-                  <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border" style={{ color: "#6B7280", borderColor: "#D1D5DB" }}>{o.lift} lift</span>
+                  <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border" style={{ color: "#6B7280", borderColor: "#D1D5DB" }}>{o.impact || o.lift} impact</span>
                 </div>
               </div>
               <p className="text-[13px] mt-1.5 italic" style={{ color: "#374151" }}>“{o.question}”</p>
@@ -235,9 +235,17 @@ export default function App() {
   const [nameInput, setNameInput] = useState("");
   const [sessionId] = useState(() => "s_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
   const scrollRef = useRef(null);
+  const deliverableRef = useRef(null);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    // When the deliverable appears, scroll to its TOP so the user sees the
+    // model first (not auto-scrolled past it). Otherwise keep the chat pinned
+    // to the newest message.
+    if (deliverable) {
+      deliverableRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    } else {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    }
   }, [messages, loading, deliverable, generating]);
 
   const send = async () => {
@@ -334,6 +342,24 @@ export default function App() {
             <p className="mt-2 text-sm max-w-sm" style={{ color: "#6B7280" }}>
               A short conversation to map how your product creates impact — and where measuring it could help most. Takes about 5–10 minutes.
             </p>
+
+            <div className="mt-5 flex items-center justify-center gap-2 text-[11px] max-w-md" style={{ color: INK }}>
+              <div className="flex items-center gap-1.5">
+                <span className="flex items-center justify-center w-5 h-5 rounded-full text-white text-[10px] font-bold" style={{ background: COBALT }}>1</span>
+                <span>Discuss your context</span>
+              </div>
+              <span style={{ color: "#CBD5E1" }}>→</span>
+              <div className="flex items-center gap-1.5">
+                <span className="flex items-center justify-center w-5 h-5 rounded-full text-white text-[10px] font-bold" style={{ background: COBALT }}>2</span>
+                <span>Review your impact model</span>
+              </div>
+              <span style={{ color: "#CBD5E1" }}>→</span>
+              <div className="flex items-center gap-1.5">
+                <span className="flex items-center justify-center w-5 h-5 rounded-full text-white text-[10px] font-bold" style={{ background: COBALT }}>3</span>
+                <span>Connect with Cobalt</span>
+              </div>
+            </div>
+
             <p className="mt-4 text-[13px] max-w-sm" style={{ color: "#9CA3AF" }}>
               You're part of an invited review group. Your name just helps us follow up on your feedback.
             </p>
@@ -389,7 +415,7 @@ export default function App() {
             </div>
           )}
 
-          {deliverable && <Deliverable d={deliverable} />}
+          {deliverable && <div ref={deliverableRef}><Deliverable d={deliverable} /></div>}
 
           {error && <div className="text-center text-xs" style={{ color: AMBER }}>{error}</div>}
         </div>
