@@ -67,6 +67,7 @@ Give 3-5 prioritized measurement opportunities. Each: a plain-English question i
 Keep all text tight. Output ONLY this JSON shape:
 {
  "company":"short name or 'Your product'",
+ "reflectBack":"2-4 sentence plain-language summary of the founder's solution and situation, in the warm reflect-back voice used at the end of the conversation — what the product does, who it's for, the outcome it drives, and the core evidence question. This is shown at the top of the report as an orientation.",
  "model":{
   "product":{"label":"...","status":"confirmed|assumed"},
   "implementationMechanism":{"label":"short phrase","status":"confirmed|assumed"},
@@ -161,26 +162,36 @@ function MaturityBar({ value, max = 5 }) {
   );
 }
 
-// Small "(i)" affordance that reveals next-level guidance on hover/focus/tap.
+// Small "(i)" affordance that reveals next-level guidance. Click to toggle;
+// clicking anywhere else closes it. (Hover was unreliable — a gap between the
+// button and the popover caused it to flicker shut.)
 function InfoTip({ text }) {
   const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open]);
   if (!text) return null;
   return (
-    <span className="relative inline-block align-middle ml-1">
+    <span className="relative inline-block align-middle ml-1" ref={ref}>
       <button
-        onClick={() => setOpen((o) => !o)}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
         className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold"
-        style={{ background: "#DBEAFE", color: COBALT }}
+        style={{ background: open ? COBALT : "#DBEAFE", color: open ? "white" : COBALT }}
         aria-label="What would move this up a level"
+        aria-expanded={open}
         type="button"
       >
         i
       </button>
       {open && (
         <span
-          className="absolute z-10 left-1/2 -translate-x-1/2 mt-1 w-56 p-2 rounded-lg text-[11px] leading-snug shadow-lg"
+          className="absolute z-20 right-0 mt-1 w-60 p-2.5 rounded-lg text-[11px] leading-snug shadow-lg text-left font-normal normal-case tracking-normal"
           style={{ background: INK, color: "white" }}
         >
           {text}
@@ -227,12 +238,26 @@ function Deliverable({ d }) {
     const ensureSpace = (needed) => {
       if (y + needed > pageH - margin) { doc.addPage(); y = margin; }
     };
+    // jsPDF's Helvetica can't render many Unicode glyphs (arrows, en/em dashes,
+    // smart quotes, bullets) and mangles line spacing when it hits them. Convert
+    // any such characters to safe ASCII before drawing. Applied to EVERY string.
+    const asciiSafe = (s) =>
+      String(s == null ? "" : s)
+        .replace(/[\u2192\u2794\u27A1\u2B95]/g, "->")   // arrows
+        .replace(/[\u2190]/g, "<-")
+        .replace(/[\u2013\u2014]/g, "-")                 // en/em dash
+        .replace(/[\u2018\u2019\u201A\u201B]/g, "'")     // smart single quotes
+        .replace(/[\u201C\u201D\u201E\u201F]/g, '"')     // smart double quotes
+        .replace(/[\u2022\u25CF\u25AA\u00B7]/g, "-")     // bullets / middots
+        .replace(/[\u2026]/g, "...")                      // ellipsis
+        .replace(/[^\x00-\x7F]/g, "");                    // drop anything else non-ASCII
+
     const text = (str, x, opts = {}) => {
       const { size = 10, color = INK_RGB, style = "normal", maxW = contentW, lh = 1.35 } = opts;
       doc.setFont("helvetica", style);
       doc.setFontSize(size);
       doc.setTextColor(color[0], color[1], color[2]);
-      const lines = doc.splitTextToSize(str, maxW);
+      const lines = doc.splitTextToSize(asciiSafe(str), maxW);
       lines.forEach((ln) => {
         ensureSpace(size * lh);
         doc.text(ln, x, y);
@@ -252,7 +277,12 @@ function Deliverable({ d }) {
     doc.setDrawColor(COBALT_RGB[0], COBALT_RGB[1], COBALT_RGB[2]);
     doc.setLineWidth(1);
     doc.line(margin, y, pageW - margin, y);
-    gap(16);
+    gap(14);
+    // Reflected summary of the founder's solution (orientation at the top of the report).
+    if (d.reflectBack) {
+      text(d.reflectBack, margin, { size: 10, color: INK_RGB, style: "italic", lh: 1.4 });
+      gap(14);
+    }
 
     // Impact Process Model
     text("Draft Impact Process Model", margin, { size: 13, color: INK_RGB, style: "bold" });
