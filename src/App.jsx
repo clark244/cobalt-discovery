@@ -191,8 +191,8 @@ function InfoTip({ text }) {
       </button>
       {open && (
         <span
-          className="absolute z-20 right-0 mt-1 w-60 p-2.5 rounded-lg text-[11px] leading-snug shadow-lg text-left font-normal normal-case tracking-normal"
-          style={{ background: INK, color: "white" }}
+          className="absolute z-20 right-0 mt-1 w-60 p-2.5 rounded-lg text-[11px] leading-snug shadow-lg text-left font-normal normal-case tracking-normal border"
+          style={{ background: "white", color: INK, borderColor: "#E5E7EB" }}
         >
           {text}
         </span>
