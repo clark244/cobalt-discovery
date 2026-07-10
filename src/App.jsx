@@ -17,21 +17,22 @@ const CONVO_SYSTEM = `You are Cobalt Collective's discovery guide, talking with 
 CORE FRAMES you are working toward (do not lecture about these — use them to steer your questions):
 - Purpose of evidence: understand WHO actually needs evidence about the product and WHAT decision it informs — the team improving the product, a buyer deciding whether to purchase, a funder deciding whether to renew. Surface this naturally through plain questions.
 - The causal chain (implementation science): product → [implementation mechanism] → user behavior → [intervention mechanism] → outcome. The implementation mechanism is how the product gets users to actually behave a certain way; user behavior is what users do; the intervention mechanism is why that behavior produces the outcome. Probe where the chain is genuinely understood vs. merely asserted (the gap between behavior and outcome is the classic blind spot).
-- Capacity: people + analytic skill + usable data + budget. The binding constraint matters more than the average.
+- Capacity has THREE distinct components, each worth understanding separately: (a) analytic skill — who would own measurement and do they have the research-design chops; (b) data infrastructure — does usable data exist and how organized is it; (c) budget — is there money/staffing for measurement, and is it external grant-dependent or internally committed. These are genuinely different things; get a read on each.
 
 PROCESS (move through these adaptively — if an answer is rich, move on; if thin or vague, ask ONE sharp follow-up):
 1. Orientation: what the product is, who the users are, the outcome it's meant to drive.
 2. The question behind the question: who needs evidence about the product, and what decision that evidence informs.
 3. The causal chain: walk product → user behavior → outcome, and name the two linking mechanisms. Find where it's solid vs. assumed.
-4. Capacity: people, skill, data, budget — find the binding constraint.
+4. Disconfirmation (ask this when the founder has articulated a reasonably coherent chain — it's how you tell a well-reasoned theory from a truly rigorous one; skip it only if the chain is still too vague to make the question meaningful): ask, in your own warm phrasing, something like "What would you expect to see if this mechanism ISN'T working the way you think — what data would tell you that?" A founder who can answer this crisply is operating at a higher level than one who can only describe the intended path.
+5. Capacity: get a separate read on analytic skill, data infrastructure, and budget — people, data, and money/bandwidth. Don't just find the weakest; understand all three.
 
 STYLE:
 - Warm, plain-spoken, curious. One question at a time. Keep turns short (2-4 sentences). No jargon dumps. Reflect back what you heard in their own words before moving on.
 - Never use internal framework labels or jargon in the conversation. In particular, do NOT use the words "know" versus "prove" as a framing — ask plainly about who needs evidence and why instead.
 - Don't grade them. Don't pad with praise.
-- Adapt depth to their answers. A focused founder might need ~6 exchanges; a vaguer one more.
+- Adapt depth to their answers. A focused founder might need ~6 exchanges; a vaguer one more. Keep the whole thing brief — the disconfirmation question is encouraged where it fits, not a mandatory hoop for every conversation.
 
-WHEN YOU HAVE ENOUGH (a working read on the causal chain, who needs evidence and for what decision, and rough capacity): give a brief, friendly reflect-back of your understanding in 3-4 sentences, then on its own final line output exactly: [[READY]]
+WHEN YOU HAVE ENOUGH (a working read on the causal chain, who needs evidence and for what decision, and all three capacity components): give a brief, friendly reflect-back of your understanding in 3-4 sentences, then on its own final line output exactly: [[READY]]
 Do not output [[READY]] before you have a real read on all four areas.`;
 
 const SYNTH_SYSTEM = `You are Cobalt Collective's analyst. Read the discovery conversation and produce a draft deliverable as STRICT JSON only — no markdown, no backticks, no preamble.
@@ -40,9 +41,26 @@ Use Cobalt's causal chain: product → [implementation mechanism] → user behav
 
 Keep each label SHORT — a noun phrase of roughly 4-9 words, not a sentence. The mechanism phrases can be a touch longer but stay tight.
 
-Maturity (1-4 each, be honest, score the gap not the polish):
-- clarity: 1 outcome only / 2 behavior named, mechanism vague / 3 coherent chain but untested / 4 defined and operationalized.
-- capacity: 1 cannot execute / 2 one binding gap / 3 can execute with support / 4 self-sufficient.
+=== SCORING — use Cobalt's real 1-5 rubrics. Score the GAP, not the polish. Levels are CUMULATIVE: a company must satisfy every level below to qualify for a level. Anchor on the weakest/first broken link, not the most impressive stated ambition. ===
+
+CLARITY (1-5), single score:
+1 Unclear — no clearly identified outcome or mechanism.
+2 Outcome only — names an intended outcome, but no user behavior or mechanism specified (outcome is often a restated mission).
+3 Behavior named, mechanism vague — names the key user behavior, but the link from behavior to outcome is asserted, not reasoned (a black box).
+4 Coherent chain, untested — can articulate product→behavior AND behavior→outcome mechanisms and name the active ingredient; untested, constructs not yet operationalized into measures.
+5 Defined and operationalized — constructs concrete enough to measure; the founder can state what data would CONFIRM or DISCONFIRM their own theory. Only score 5 if the transcript shows the founder actually articulating what would disconfirm their theory or what data would tell them they're wrong. If they were never asked or never demonstrated this, cap clarity at 4.
+
+CAPACITY (1-5) — score THREE components INDEPENDENTLY, then average them (arithmetic mean; do NOT take the minimum). Round the average to the nearest tenth.
+Analytic skill:
+ 1 None. 2 Smart engineer, skillset adjacent but not core to impact measurement (IM); IM owner not yet clear. 3 Data-science skill sufficient to run many analyses, IM owner clear, but lacks specific research-design expertise to fully implement an IM plan. 4 Sufficient in-house research/analytic skill to fully implement an IM plan; IM owner clear. 5 Exceptional R&D skill, unusual for the company's stage.
+Data infrastructure:
+ 1 None, or too messy to use. 2 Available but not yet organized. 3 Organized and usable with minimal additional work. 4 Collected and organized for routine IM analyses. 5 Rich, well-organized, transparently useful for internal and external decisions.
+Budget (the axis is a STRATEGIC SHIFT from external/grant-dependent → internal ownership; internal commitment outranks secured external grant money, even when the internal commitment is only tentative):
+ 1 None. 2 Requesting an external, time-limited grant. 3 Obtained commitment for an external, time-limited grant. 4 Internal budget is plausible and an internal owner is identified, but not yet committed. 5 Committed internal budget AND staffing for ongoing IM, with an identified owner.
+
+=== TOOLTIPS — for each score, state specifically what would need to be true to reach ONE level higher, using the rubric anchor language above, not generic encouragement. ===
+- clarityNext: one sentence naming the concrete gap between the current clarity level and the next. If at level 5, say the theory is operationalized and name what to sustain.
+- For capacity: identify the LOWEST-scoring component (if two tie for lowest, name both). capacityLimiter is that component's name ("analytic skill" | "data infrastructure" | "budget"). capacityNext: one sentence naming what moving that component up one level would look like, in the rubric's terms, and noting it would raise the overall average.
 
 Give 3-5 prioritized measurement opportunities. Each: a plain-English question it answers, type "know" or "prove" (know = evidence that helps the team improve the product; prove = evidence for an external buyer or funder), impact "low"/"medium"/"high" (how much this evidence would matter for the team's most important decisions), and a one-sentence rationale. Order by usefulness.
 
@@ -56,7 +74,16 @@ Keep all text tight. Output ONLY this JSON shape:
   "interventionMechanism":{"label":"short phrase","status":"confirmed|assumed"},
   "outcome":{"label":"...","status":"confirmed|assumed"}
  },
- "maturity":{"clarity":1,"clarityNote":"one sentence","capacity":1,"capacityNote":"one sentence"},
+ "maturity":{
+  "clarity":1,
+  "clarityNote":"one sentence on the current clarity level",
+  "clarityNext":"one sentence: what would move clarity up one level",
+  "capacity":1.0,
+  "capacityComponents":{"analyticSkill":1,"dataInfrastructure":1,"budget":1},
+  "capacityNote":"one sentence on the current capacity picture across the three components",
+  "capacityLimiter":"analytic skill|data infrastructure|budget",
+  "capacityNext":"one sentence: what moving the limiting component up one level would look like"
+ },
  "opportunities":[{"title":"...","question":"...","type":"know|prove","impact":"low|medium|high","rationale":"one sentence"}],
  "emailSummary":"3-4 sentence plain-text summary the founder could paste into an email to Cobalt to start a conversation."
 }`;
@@ -117,13 +144,49 @@ function Connector({ data }) {
   );
 }
 
-function MaturityBar({ value }) {
+function MaturityBar({ value, max = 5 }) {
+  const v = Number(value) || 0;
   return (
     <div className="flex gap-1 mt-1">
-      {[1, 2, 3, 4].map((n) => (
-        <div key={n} className="h-1.5 flex-1 rounded-full" style={{ background: n <= value ? COBALT : "#E5E7EB" }} />
-      ))}
+      {Array.from({ length: max }, (_, i) => i + 1).map((n) => {
+        // Fractional fill: a segment can be fully, partially, or not filled.
+        const fill = Math.max(0, Math.min(1, v - (n - 1)));
+        return (
+          <div key={n} className="h-1.5 flex-1 rounded-full overflow-hidden" style={{ background: "#E5E7EB" }}>
+            <div className="h-full rounded-full" style={{ width: `${fill * 100}%`, background: COBALT }} />
+          </div>
+        );
+      })}
     </div>
+  );
+}
+
+// Small "(i)" affordance that reveals next-level guidance on hover/focus/tap.
+function InfoTip({ text }) {
+  const [open, setOpen] = useState(false);
+  if (!text) return null;
+  return (
+    <span className="relative inline-block align-middle ml-1">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold"
+        style={{ background: "#DBEAFE", color: COBALT }}
+        aria-label="What would move this up a level"
+        type="button"
+      >
+        i
+      </button>
+      {open && (
+        <span
+          className="absolute z-10 left-1/2 -translate-x-1/2 mt-1 w-56 p-2 rounded-lg text-[11px] leading-snug shadow-lg"
+          style={{ background: INK, color: "white" }}
+        >
+          {text}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -245,13 +308,42 @@ function Deliverable({ d }) {
     const mat = d.maturity || {};
     text("Maturity", margin, { size: 11, color: INK_RGB, style: "bold" });
     gap(6);
-    text(`Causal model clarity: ${mat.clarity ?? "-"} / 4`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
+    // Clarity
+    text(`Causal model clarity: ${mat.clarity ?? "-"} / 5`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
     gap(2);
     text(mat.clarityNote || "", margin, { size: 9, color: GRAY_RGB });
-    gap(6);
-    text(`Measurement capacity: ${mat.capacity ?? "-"} / 4`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
+    if (mat.clarityNext) {
+      gap(1);
+      text(`To reach the next level: ${mat.clarityNext}`, margin, { size: 8.5, color: COBALT_RGB, style: "italic" });
+    }
+    gap(8);
+    // Capacity
+    text(`Measurement capacity: ${mat.capacity ?? "-"} / 5`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
     gap(2);
     text(mat.capacityNote || "", margin, { size: 9, color: GRAY_RGB });
+    if (mat.capacityComponents) {
+      const cc = mat.capacityComponents;
+      const lim = (mat.capacityLimiter || "").toLowerCase();
+      const rows = [
+        ["Analytic skill", cc.analyticSkill, "analytic skill"],
+        ["Data infrastructure", cc.dataInfrastructure, "data infrastructure"],
+        ["Budget", cc.budget, "budget"],
+      ];
+      gap(2);
+      rows.forEach(([label, val, key]) => {
+        const isLim = lim === key;
+        gap(1);
+        text(`   ${label}: ${val ?? "-"} / 5${isLim ? "  (limiting)" : ""}`, margin, {
+          size: 8.5,
+          color: isLim ? AMBER_RGB : GRAY_RGB,
+          style: isLim ? "bold" : "normal",
+        });
+      });
+    }
+    if (mat.capacityNext) {
+      gap(1);
+      text(`To reach the next level: ${mat.capacityNext}`, margin, { size: 8.5, color: COBALT_RGB, style: "italic" });
+    }
     gap(14);
 
     // Opportunities
@@ -313,14 +405,45 @@ function Deliverable({ d }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="rounded-xl border border-slate-200 p-3">
-          <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: INK }}>Causal model clarity</div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: INK }}>Causal model clarity</div>
+            <div className="text-xs font-bold" style={{ color: COBALT }}>
+              {d.maturity?.clarity ?? "–"}<span style={{ color: "#9CA3AF" }}> / 5</span>
+              <InfoTip text={d.maturity?.clarityNext} />
+            </div>
+          </div>
           <MaturityBar value={d.maturity?.clarity} />
           <p className="text-xs mt-2" style={{ color: "#4B5563" }}>{d.maturity?.clarityNote}</p>
         </div>
         <div className="rounded-xl border border-slate-200 p-3">
-          <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: INK }}>Measurement capacity</div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: INK }}>Measurement capacity</div>
+            <div className="text-xs font-bold" style={{ color: COBALT }}>
+              {d.maturity?.capacity ?? "–"}<span style={{ color: "#9CA3AF" }}> / 5</span>
+              <InfoTip text={d.maturity?.capacityNext} />
+            </div>
+          </div>
           <MaturityBar value={d.maturity?.capacity} />
           <p className="text-xs mt-2" style={{ color: "#4B5563" }}>{d.maturity?.capacityNote}</p>
+          {d.maturity?.capacityComponents && (
+            <div className="mt-2 space-y-0.5">
+              {[
+                ["Analytic skill", d.maturity.capacityComponents.analyticSkill, "analytic skill"],
+                ["Data infrastructure", d.maturity.capacityComponents.dataInfrastructure, "data infrastructure"],
+                ["Budget", d.maturity.capacityComponents.budget, "budget"],
+              ].map(([label, val, key]) => {
+                const isLimiter = (d.maturity?.capacityLimiter || "").toLowerCase() === key;
+                return (
+                  <div key={key} className="flex items-center justify-between text-[11px]">
+                    <span style={{ color: isLimiter ? AMBER : "#6B7280", fontWeight: isLimiter ? 600 : 400 }}>
+                      {label}{isLimiter ? " · limiting" : ""}
+                    </span>
+                    <span style={{ color: isLimiter ? AMBER : "#6B7280", fontWeight: isLimiter ? 600 : 400 }}>{val ?? "–"}/5</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
