@@ -24,7 +24,7 @@ PROCESS (move through these adaptively — if an answer is rich, move on; if thi
 2. The question behind the question: who needs evidence about the product, and what decision that evidence informs.
 3. The causal chain: walk product → user behavior → outcome, and name the two linking mechanisms. Find where it's solid vs. assumed.
 4. Disconfirmation (ask this when the founder has articulated a reasonably coherent chain — it's how you tell a well-reasoned theory from a truly rigorous one; skip it only if the chain is still too vague to make the question meaningful): ask, in your own warm phrasing, something like "What would you expect to see if this mechanism ISN'T working the way you think — what data would tell you that?" A founder who can answer this crisply is operating at a higher level than one who can only describe the intended path.
-5. Capacity: get a separate read on analytic skill, data infrastructure, and budget — people, data, and money/bandwidth. Don't just find the weakest; understand all three.
+5. Capacity: get a separate read on analytic skill, data infrastructure, and budget — people, data, and money/bandwidth. Don't just find the weakest; understand all three. The FIRST time you turn to this capacity area (people/data/budget), begin that message with the exact tag [[CAPACITY]] on its own, then your message. Output this tag only once per conversation, on the first capacity-focused turn.
 
 STYLE:
 - Warm, plain-spoken, curious. One question at a time. Keep turns short (2-4 sentences). No jargon dumps. Reflect back what you heard in their own words before moving on.
@@ -201,8 +201,46 @@ function InfoTip({ text }) {
   );
 }
 
-// Where "Email Cobalt" outreach is sent. Change this to a shared inbox if desired.
-const COBALT_EMAIL = "clark@cobaltcollective.org";
+// Persistent 4-phase progress strip shown under the header during a session.
+function PhaseTracker({ phase }) {
+  const PHASES = [
+    { label: "Getting started" },
+    { label: "How it works" },
+    { label: "Making it happen" },
+    { label: "Your results" },
+  ];
+  return (
+    <div className="flex items-center px-4 sm:px-5 py-2.5 border-b border-slate-100">
+      {PHASES.map((p, i) => {
+        const state = i < phase ? "done" : i === phase ? "current" : "todo";
+        const circleBg = state === "current" ? COBALT : state === "done" ? "#EAF3FB" : "#F3F4F6";
+        const circleBd = state === "current" ? COBALT : state === "done" ? "#85B7EB" : "#E5E7EB";
+        const labelColor = state === "current" ? INK : state === "done" ? "#6B7280" : "#B4B7BD";
+        const labelWeight = state === "current" ? 600 : 400;
+        return (
+          <React.Fragment key={i}>
+            <div className="flex flex-col items-center gap-1 shrink-0" style={{ width: 72 }}>
+              <div
+                className="flex items-center justify-center rounded-full"
+                style={{ width: 22, height: 22, background: circleBg, border: `1.5px solid ${circleBd}` }}
+              >
+                {state === "done" ? (
+                  <span style={{ color: "#2F6FB0", fontSize: 12, lineHeight: 1 }}>✓</span>
+                ) : (
+                  <span style={{ color: state === "current" ? "white" : "#B4B7BD", fontSize: 10, fontWeight: 700, lineHeight: 1 }}>{i + 1}</span>
+                )}
+              </div>
+              <div style={{ fontSize: 10, lineHeight: 1.15, textAlign: "center", color: labelColor, fontWeight: labelWeight }}>{p.label}</div>
+            </div>
+            {i < PHASES.length - 1 && (
+              <div className="flex-1" style={{ height: 1.5, background: i < phase ? "#85B7EB" : "#E5E7EB", margin: "0 2px", position: "relative", top: -9 }} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
 
 function Deliverable({ d }) {
   const [copied, setCopied] = useState(false);
@@ -535,6 +573,7 @@ export default function App() {
   const [reviewer, setReviewer] = useState("");      // reviewer name/initials
   const [started, setStarted] = useState(false);     // false until name entered
   const [nameInput, setNameInput] = useState("");
+  const [phase, setPhase] = useState(0); // 0 getting started, 1 how it works, 2 making it happen, 3 your results
   const [sessionId] = useState(() => "s_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
   const scrollRef = useRef(null);
   const deliverableRef = useRef(null);
@@ -558,11 +597,18 @@ export default function App() {
     setMessages(next);
     setInput("");
     setLoading(true);
+    // First founder answer moves us out of "Getting started" into "How it works".
+    setPhase((p) => (p < 1 ? 1 : p));
     try {
       let reply = await callClaude(CONVO_SYSTEM, next, 900);
+      if (reply.includes("[[CAPACITY]]")) {
+        reply = reply.replace(/\[\[CAPACITY\]\]/g, "").trim();
+        setPhase((p) => (p < 2 ? 2 : p));
+      }
       if (reply.includes("[[READY]]")) {
         reply = reply.replace(/\[\[READY\]\]/g, "").trim();
         setReady(true);
+        setPhase((p) => (p < 2 ? 2 : p)); // ensure at least capacity phase by the time we're ready
       }
       setMessages([...next, { role: "assistant", content: reply }]);
     } catch (e) {
@@ -602,6 +648,7 @@ export default function App() {
       const clean = raw.replace(/```json/g, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(clean.slice(clean.indexOf("{"), clean.lastIndexOf("}") + 1));
       setDeliverable(parsed);
+      setPhase(3); // Your results
       saveSession(parsed); // observability: log the full session for reviewer feedback
 
     } catch (e) {
@@ -619,6 +666,7 @@ export default function App() {
     setInput("");
     setStarted(false);
     setNameInput("");
+    setPhase(0);
   };
 
   return (
@@ -637,6 +685,8 @@ export default function App() {
           )}
         </div>
 
+        {started && <PhaseTracker phase={phase} />}
+
         {!started ? (
           <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
             <CobaltLogo size={48} />
@@ -644,23 +694,6 @@ export default function App() {
             <p className="mt-2 text-sm max-w-sm" style={{ color: "#6B7280" }}>
               A short conversation to map how your product creates impact — and where measuring it could help most. Takes about 5–10 minutes.
             </p>
-
-            <div className="mt-5 flex items-center justify-center gap-2 text-[11px] max-w-md" style={{ color: INK }}>
-              <div className="flex items-center gap-1.5">
-                <span className="flex items-center justify-center w-5 h-5 rounded-full text-white text-[10px] font-bold" style={{ background: COBALT }}>1</span>
-                <span>Discuss your context</span>
-              </div>
-              <span style={{ color: "#CBD5E1" }}>→</span>
-              <div className="flex items-center gap-1.5">
-                <span className="flex items-center justify-center w-5 h-5 rounded-full text-white text-[10px] font-bold" style={{ background: COBALT }}>2</span>
-                <span>Review your impact model</span>
-              </div>
-              <span style={{ color: "#CBD5E1" }}>→</span>
-              <div className="flex items-center gap-1.5">
-                <span className="flex items-center justify-center w-5 h-5 rounded-full text-white text-[10px] font-bold" style={{ background: COBALT }}>3</span>
-                <span>Connect with Cobalt</span>
-              </div>
-            </div>
 
             <p className="mt-4 text-[13px] max-w-sm" style={{ color: "#9CA3AF" }}>
               You're part of an invited review group. Your name just helps us follow up on your feedback.
