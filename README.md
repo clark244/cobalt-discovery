@@ -3,6 +3,8 @@
 React + Vite app, deployed on Netlify. The Anthropic API call is proxied
 through a Netlify serverless function so the API key stays server-side.
 
+test
+
 ## Setup
 1. Push this repo to GitHub.
 2. In Netlify: New site from Git → pick this repo. Build settings auto-detected from netlify.toml.
