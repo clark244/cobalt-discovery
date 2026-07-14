@@ -66,6 +66,13 @@ Budget (the axis is a STRATEGIC SHIFT from external/grant-dependent → internal
 
 Give 3-5 prioritized measurement opportunities. Each: a plain-English question it answers, type "know" or "prove" (know = evidence that helps the team improve the product; prove = evidence for an external buyer or funder), impact "low"/"medium"/"high" (how much this evidence would matter for the team's most important decisions), and a one-sentence rationale. Order by usefulness.
 
+For each opportunity, also give 1-2 concrete EXAMPLES of how the team could actually measure it, in the "examples" array. Rules for examples:
+- SPECIFIC, not generic. Name the actual instrument, comparison, or data source and tie it to THIS product's construct and the data the founder described (e.g., "a 6-item self-report on constructive-disagreement confidence, given at signup and again after 8 weeks, compared against in-app debate-completion logs"). Never write a generic method like "run a pre/post survey" or "do a study" with no specifics.
+- ILLUSTRATIVE, not prescriptive. Frame each as one possibility, beginning with phrasing like "One way could be…" or "For example, a team at your stage might…". It is an example of how this could be done, not THE answer.
+- CALIBRATED to their measurement capacity score. Do not propose an RCT, a control group, or a data pipeline to a team whose analytic-skill or data-infrastructure score is low; propose the lightest credible design that would still answer the question. Reserve heavier designs for teams whose capacity supports them.
+- A SECOND example only when it is a genuinely different tradeoff — e.g., a quick, lightweight read versus a more rigorous design. If a second example would just restate the first, give only one.
+- If you cannot state a concrete, specific example for an opportunity, return an empty array for "examples" rather than inventing generic filler.
+
 Keep all text tight. Output ONLY this JSON shape:
 {
  "company":"short name or 'Your product'",
@@ -87,7 +94,7 @@ Keep all text tight. Output ONLY this JSON shape:
   "capacityLimiter":"analytic skill|data infrastructure|budget",
   "capacityNext":"one sentence: what moving the limiting component up one level would look like"
  },
- "opportunities":[{"title":"...","question":"...","type":"know|prove","impact":"low|medium|high","rationale":"one sentence"}],
+ "opportunities":[{"title":"...","question":"...","type":"know|prove","impact":"low|medium|high","rationale":"one sentence","examples":["specific, illustrative, capacity-matched way to measure this; 1-2 items, or [] if none can be stated concretely"]}],
  "emailSummary":"3-4 sentence plain-text summary the founder could paste into an email to Cobalt to start a conversation."
 }`;
 
@@ -274,6 +281,8 @@ function PhaseTracker({ phase }) {
 
 function Deliverable({ d }) {
   const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState({}); // which opportunity cards are open (screen-only)
+  const toggle = (i) => setExpanded((e) => ({ ...e, [i]: !e[i] }));
   const copy = () => {
     navigator.clipboard?.writeText(d.emailSummary || "");
     setCopied(true);
@@ -448,13 +457,21 @@ function Deliverable({ d }) {
     text("Where measurement could help", margin, { size: 13, color: INK_RGB, style: "bold" });
     gap(8);
     (d.opportunities || []).forEach((o, i) => {
-      ensureSpace(44);
+      ensureSpace(56);
       const badge = `[${(o.type || "").toUpperCase()} - ${(o.impact || o.lift || "")} impact]`;
       text(`${i + 1}. ${o.title}   ${badge}`, margin, { size: 10.5, color: INK_RGB, style: "bold" });
       gap(2);
       text(`"${o.question}"`, margin + 12, { size: 9.5, color: [55, 65, 81], style: "italic", maxW: contentW - 12 });
       gap(1);
       text(o.rationale || "", margin + 12, { size: 9, color: GRAY_RGB, maxW: contentW - 12 });
+      if (Array.isArray(o.examples) && o.examples.length > 0) {
+        gap(3);
+        text("How you could measure it:", margin + 12, { size: 8.5, color: COBALT_RGB, style: "bold", maxW: contentW - 12 });
+        o.examples.forEach((ex) => {
+          gap(1);
+          text(`-  ${ex}`, margin + 18, { size: 8.5, color: [55, 65, 81], maxW: contentW - 18 });
+        });
+      }
       gap(8);
     });
     gap(6);
@@ -546,20 +563,55 @@ function Deliverable({ d }) {
       </div>
 
       <div>
-        <h2 className="text-lg font-bold mb-3" style={{ color: INK }}>Where measurement could help</h2>
-        <div className="space-y-3">
-          {(d.opportunities || []).map((o, i) => (
-            <div key={i} className="rounded-xl border border-slate-200 p-3">
-              <div className="flex items-start justify-between gap-2 flex-wrap">
-                <div className="font-semibold text-sm" style={{ color: INK }}>{i + 1}. {o.title}</div>
-                <div className="flex gap-1.5 shrink-0">
-                  <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border" style={{ color: "#6B7280", borderColor: "#D1D5DB" }}>{o.impact || o.lift} impact</span>
-                </div>
+        <h2 className="text-lg font-bold mb-1" style={{ color: INK }}>Where measurement could help</h2>
+        <p className="text-xs mb-3" style={{ color: "#9CA3AF" }}>Tap a question to see why it matters and an example or two of how you could measure it.</p>
+        <div className="space-y-2">
+          {(d.opportunities || []).map((o, i) => {
+            const isOpen = !!expanded[i];
+            const isProve = o.type === "prove";
+            const hasExamples = Array.isArray(o.examples) && o.examples.length > 0;
+            return (
+              <div key={i} className="rounded-xl border border-slate-200 overflow-hidden">
+                <button
+                  onClick={() => toggle(i)}
+                  aria-expanded={isOpen}
+                  className="w-full text-left p-3 flex items-start justify-between gap-2 hover:bg-slate-50 transition-colors"
+                >
+                  <div className="flex items-start gap-2 min-w-0">
+                    <span
+                      className="text-[11px] mt-0.5 shrink-0"
+                      style={{ color: "#9CA3AF", transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 120ms" }}
+                    >▶</span>
+                    <span className="font-semibold text-sm" style={{ color: INK }}>{i + 1}. {o.question}</span>
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border"
+                      style={{ color: isProve ? AMBER : COBALT, borderColor: isProve ? "#FDE1B8" : "#BFDBFE" }}>{o.type}</span>
+                    <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border"
+                      style={{ color: "#6B7280", borderColor: "#D1D5DB" }}>{o.impact || o.lift} impact</span>
+                  </div>
+                </button>
+                {isOpen && (
+                  <div className="px-3 pb-3 pl-9 space-y-2">
+                    <p className="text-xs" style={{ color: "#6B7280" }}>{o.rationale}</p>
+                    {hasExamples && (
+                      <div className="rounded-lg p-2.5" style={{ background: "#F8FAFC" }}>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: COBALT }}>How you could measure it</div>
+                        <ul className="space-y-1">
+                          {o.examples.map((ex, j) => (
+                            <li key={j} className="text-xs flex gap-1.5" style={{ color: "#374151" }}>
+                              <span style={{ color: "#9CA3AF" }}>•</span>
+                              <span>{ex}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <p className="text-[13px] mt-1.5 italic" style={{ color: "#374151" }}>“{o.question}”</p>
-              <p className="text-xs mt-1.5" style={{ color: "#6B7280" }}>{o.rationale}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
