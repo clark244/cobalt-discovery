@@ -111,13 +111,13 @@ const SYNTH_OPPS_SYSTEM = `You are Cobalt Collective's analyst. You are given a 
 
 Use the causal model to locate where evidence is weakest (the "assumed" links are the honest gaps), and use the capacity scores you are given (analyticSkill, dataInfrastructure, budget, and the overall capacity) to calibrate how heavy each suggested measurement approach can realistically be.
 
-Give the 3 most useful prioritized measurement opportunities (exactly 3). Each: a plain-English question it answers (one sentence), type "know" or "prove" (know = evidence that helps the team improve the product; prove = evidence for an external buyer or funder), impact "low"/"medium"/"high" (how much this evidence would matter for the team's most important decisions), and a one-sentence rationale. Order by usefulness.
+Give 3-5 prioritized measurement opportunities — as many as are genuinely useful, up to 5 (don't pad; only include ones that earn their place). Each: a plain-English question it answers (ONE sentence, ≤ 20 words), type "know" or "prove" (know = evidence that helps the team improve the product; prove = evidence for an external buyer or funder), impact "low"/"medium"/"high" (how much this evidence would matter for the team's most important decisions), and a one-sentence rationale (≤ 25 words). Order by usefulness. Keep EVERY field crisp — the list must stay compact even at 5 items.
 
 For each opportunity, also give ONE concrete EXAMPLE of how the team could actually measure it, in the "examples" array (a single-item array). Rules for the example:
 - SPECIFIC, not generic. Name the actual instrument, comparison, or data source and tie it to THIS product's construct and the data the founder described (e.g., "a 6-item self-report on constructive-disagreement confidence, given at signup and again after 8 weeks, compared against in-app debate-completion logs"). Never write a generic method like "run a pre/post survey" or "do a study" with no specifics.
 - ILLUSTRATIVE, not prescriptive. Frame it as one possibility, beginning with phrasing like "One way could be…" or "For example, a team at your stage might…". It is an example of how this could be done, not THE answer.
 - CALIBRATED to the capacity scores you were given. Do not propose an RCT, a control group, or a data pipeline to a team whose analytic-skill or data-infrastructure score is low; propose the lightest credible design that would still answer the question. Reserve heavier designs for teams whose capacity supports them.
-- Keep it to one tight sentence.
+- Keep it to one tight sentence (≤ 30 words).
 - If you cannot state a concrete, specific example for an opportunity, return an empty array for "examples" rather than inventing generic filler.
 
 Keep all text tight. Output ONLY this JSON shape:
@@ -309,7 +309,7 @@ function PhaseTracker({ phase }) {
 
 function Deliverable({ d }) {
   const [copied, setCopied] = useState(false);
-  const [expanded, setExpanded] = useState({}); // which opportunity cards are open (screen-only)
+  const [expanded, setExpanded] = useState({ 0: true }); // which opportunity cards are open (screen-only); top card open by default
   const toggle = (i) => setExpanded((e) => ({ ...e, [i]: !e[i] }));
   const copy = () => {
     navigator.clipboard?.writeText(d.emailSummary || "");
@@ -599,25 +599,34 @@ function Deliverable({ d }) {
             const isProve = o.type === "prove";
             const hasExamples = Array.isArray(o.examples) && o.examples.length > 0;
             return (
-              <div key={i} className="rounded-xl border border-slate-200 overflow-hidden">
+              <div key={i} className="rounded-xl border border-slate-200 overflow-hidden transition-colors hover:border-blue-300">
                 <button
                   onClick={() => toggle(i)}
                   aria-expanded={isOpen}
-                  className="w-full text-left p-3 flex items-start justify-between gap-2 hover:bg-slate-50 transition-colors"
+                  className="w-full text-left p-3 flex flex-col gap-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
-                  <div className="flex items-start gap-2 min-w-0">
-                    <span
-                      className="text-[11px] mt-0.5 shrink-0"
-                      style={{ color: "#9CA3AF", transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 120ms" }}
-                    >▶</span>
-                    <span className="font-semibold text-sm" style={{ color: INK }}>{i + 1}. {o.question}</span>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <span
+                        className="text-xs mt-0.5 shrink-0"
+                        style={{ color: COBALT, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 150ms" }}
+                        aria-hidden="true"
+                      >▾</span>
+                      <span className="font-semibold text-sm" style={{ color: INK }}>{i + 1}. {o.question}</span>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0">
+                      <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border"
+                        style={{ color: isProve ? AMBER : COBALT, borderColor: isProve ? "#FDE1B8" : "#BFDBFE" }}>{o.type}</span>
+                      <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border"
+                        style={{ color: "#6B7280", borderColor: "#D1D5DB" }}>{o.impact || o.lift} impact</span>
+                    </div>
                   </div>
-                  <div className="flex gap-1.5 shrink-0">
-                    <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border"
-                      style={{ color: isProve ? AMBER : COBALT, borderColor: isProve ? "#FDE1B8" : "#BFDBFE" }}>{o.type}</span>
-                    <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border"
-                      style={{ color: "#6B7280", borderColor: "#D1D5DB" }}>{o.impact || o.lift} impact</span>
-                  </div>
+                  {!isOpen && (
+                    <div className="pl-6 flex items-center gap-1 text-[11px] font-semibold" style={{ color: COBALT }}>
+                      <span>How to measure it</span>
+                      <span aria-hidden="true">▾</span>
+                    </div>
+                  )}
                 </button>
                 {isOpen && (
                   <div className="px-3 pb-3 pl-9 space-y-2">
@@ -775,7 +784,7 @@ export default function App() {
       const oppsRaw = await callClaude(
         SYNTH_OPPS_SYSTEM,
         [{ role: "user", content: `Discovery conversation:\n\n${transcript}\n\nDerived causal model and maturity scores:\n\n${JSON.stringify({ model: modelPart.model, maturity: modelPart.maturity })}\n\nProduce the opportunities JSON.` }],
-        1500
+        1800
       );
       const oppsPart = parseJson(oppsRaw, "opportunities");
       const parsed = { ...modelPart, ...oppsPart };
