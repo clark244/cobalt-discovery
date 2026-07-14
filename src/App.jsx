@@ -307,10 +307,75 @@ function PhaseTracker({ phase }) {
   );
 }
 
+// Static rubrics shown when a user expands "How is this scored?". These are Cobalt's
+// fixed 1-5 scales (not model-generated), so they're free to render and always consistent.
+const CLARITY_LEVELS = [
+  "Unclear — no clearly identified outcome or mechanism.",
+  "Outcome only — names an intended outcome, but no user behavior or mechanism.",
+  "Behavior named, mechanism vague — names the key behavior, but the link to the outcome is asserted, not reasoned.",
+  "Coherent chain, untested — can articulate both mechanisms and the active ingredient, but it's untested.",
+  "Defined and operationalized — constructs are measurable, and they can name what would confirm or disconfirm the theory.",
+];
+const CAPACITY_LEVELS = {
+  "Analytic skill": {
+    key: "analyticSkill",
+    levels: [
+      "None.",
+      "A smart engineer, but impact measurement isn't their core skill; no clear owner yet.",
+      "Enough data-science skill to run analyses, with a clear owner, but lacking research-design depth.",
+      "Enough in-house research skill to fully run a measurement plan, with a clear owner.",
+      "Exceptional R&D skill, unusual for the company's stage.",
+    ],
+  },
+  "Data infrastructure": {
+    key: "dataInfrastructure",
+    levels: [
+      "None, or too messy to use.",
+      "Available but not yet organized.",
+      "Organized and usable with minimal extra work.",
+      "Collected and organized for routine measurement analyses.",
+      "Rich, well-organized, and transparently useful for internal and external decisions.",
+    ],
+  },
+  "Budget": {
+    key: "budget",
+    levels: [
+      "None.",
+      "Requesting an external, time-limited grant.",
+      "Secured an external, time-limited grant.",
+      "Internal budget is plausible with an owner identified, but not yet committed.",
+      "Committed internal budget and staffing for ongoing measurement, with an owner.",
+    ],
+  },
+};
+
+function RubricScale({ levels, current }) {
+  return (
+    <ol className="mt-1.5 space-y-1">
+      {levels.map((desc, idx) => {
+        const lvl = idx + 1;
+        const isCurrent = lvl === current;
+        return (
+          <li
+            key={lvl}
+            className="text-[11px] leading-snug flex gap-1.5 rounded px-1.5 py-1"
+            style={{ background: isCurrent ? "#EFF4FF" : "transparent" }}
+          >
+            <span className="font-bold shrink-0" style={{ color: isCurrent ? COBALT : "#9CA3AF" }}>{lvl}</span>
+            <span style={{ color: isCurrent ? INK : "#6B7280", fontWeight: isCurrent ? 600 : 400 }}>{desc}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 function Deliverable({ d, onEmailSubmit }) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState({ 0: true }); // which opportunity cards are open (screen-only); top card open by default
   const toggle = (i) => setExpanded((e) => ({ ...e, [i]: !e[i] }));
+  const [rubric, setRubric] = useState({}); // which score card's rubric is expanded
+  const toggleRubric = (k) => setRubric((r) => ({ ...r, [k]: !r[k] }));
   const [emailInput, setEmailInput] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
   const submitEmail = () => {
@@ -516,7 +581,7 @@ function Deliverable({ d, onEmailSubmit }) {
     ensureSpace(72);
     text("Get help turning this plan into reality", margin, { size: 11, color: COBALT_RGB, style: "bold" });
     gap(4);
-    text("Cobalt Collective helps early-stage education, health, and workforce teams build impact measurement into operations to make effective products that serve their users well.", margin, { size: 8.5, color: GRAY_RGB });
+    text("Cobalt Collective helps early-stage education, health, and workforce teams build impact measurement into operations to make effective solutions that serve their users well.", margin, { size: 8.5, color: GRAY_RGB });
     gap(6);
     text(d.emailSummary || "", margin, { size: 9.5, color: INK_RGB });
     gap(6);
@@ -567,6 +632,10 @@ function Deliverable({ d, onEmailSubmit }) {
           </div>
           <MaturityBar value={d.maturity?.clarity} />
           <p className="text-xs mt-2" style={{ color: "#4B5563" }}>{d.maturity?.clarityNote}</p>
+          <button onClick={() => toggleRubric("clarity")} className="mt-2 text-[11px] font-semibold" style={{ color: COBALT }}>
+            {rubric.clarity ? "Hide scale ▴" : "How is this scored? ▾"}
+          </button>
+          {rubric.clarity && <RubricScale levels={CLARITY_LEVELS} current={d.maturity?.clarity} />}
         </div>
         <div className="rounded-xl border border-slate-200 p-3">
           <div className="flex items-center justify-between">
@@ -592,6 +661,23 @@ function Deliverable({ d, onEmailSubmit }) {
                       {label}{isLimiter ? " · limiting" : ""}
                     </span>
                     <span style={{ color: isLimiter ? AMBER : "#6B7280", fontWeight: isLimiter ? 600 : 400 }}>{val ?? "–"}/5</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <button onClick={() => toggleRubric("capacity")} className="mt-2 text-[11px] font-semibold" style={{ color: COBALT }}>
+            {rubric.capacity ? "Hide scale ▴" : "How is this scored? ▾"}
+          </button>
+          {rubric.capacity && (
+            <div className="mt-1.5 space-y-2">
+              <p className="text-[11px]" style={{ color: "#9CA3AF" }}>Capacity is the average of these three components:</p>
+              {Object.entries(CAPACITY_LEVELS).map(([name, { key, levels }]) => {
+                const cur = d.maturity?.capacityComponents?.[key];
+                return (
+                  <div key={key}>
+                    <div className="text-[11px] font-semibold" style={{ color: INK }}>{name}{cur != null ? ` · ${cur}/5` : ""}</div>
+                    <RubricScale levels={levels} current={cur} />
                   </div>
                 );
               })}
@@ -665,7 +751,7 @@ function Deliverable({ d, onEmailSubmit }) {
       <div className="rounded-xl p-4" style={{ background: "#EFF4FF" }}>
         <div className="text-[15px] font-bold" style={{ color: INK }}>Get help turning this plan into reality</div>
         <p className="text-[12px] leading-relaxed mt-1 mb-3" style={{ color: "#4B5563" }}>
-          Cobalt Collective helps early-stage education, health, and workforce teams build impact measurement into operations to make effective products that serve their users well.
+          Cobalt Collective helps early-stage education, health, and workforce teams build impact measurement into operations to make effective solutions that serve their users well.
         </p>
         <a
           href={emailHref()}
@@ -918,6 +1004,9 @@ export default function App() {
           <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
             <CobaltLogo size={48} />
             <h2 className="mt-4 text-lg font-bold" style={{ color: INK }}>Cobalt Impact Discovery</h2>
+            <p className="mt-3 text-sm max-w-md" style={{ color: "#4B5563" }}>
+              Cobalt Collective helps early-stage education, health, and workforce teams build impact measurement into how they work — so they can make solutions that genuinely serve their users.
+            </p>
             <p className="mt-2 text-sm max-w-sm" style={{ color: "#6B7280" }}>
               A short conversation to map how your solution creates impact — and where measuring it could help most. Takes about 5–10 minutes.
             </p>
