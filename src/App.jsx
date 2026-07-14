@@ -64,13 +64,13 @@ Budget (the axis is a STRATEGIC SHIFT from external/grant-dependent → internal
 - clarityNext: one sentence naming the concrete gap between the current clarity level and the next. If at level 5, say the theory is operationalized and name what to sustain.
 - For capacity: identify the LOWEST-scoring component (if two tie for lowest, name both). capacityLimiter is that component's name ("analytic skill" | "data infrastructure" | "budget"). capacityNext: one sentence naming what moving that component up one level would look like, in the rubric's terms, and noting it would raise the overall average.
 
-Give 3-5 prioritized measurement opportunities. Each: a plain-English question it answers, type "know" or "prove" (know = evidence that helps the team improve the product; prove = evidence for an external buyer or funder), impact "low"/"medium"/"high" (how much this evidence would matter for the team's most important decisions), and a one-sentence rationale. Order by usefulness.
+Give 3-4 prioritized measurement opportunities. Each: a plain-English question it answers, type "know" or "prove" (know = evidence that helps the team improve the product; prove = evidence for an external buyer or funder), impact "low"/"medium"/"high" (how much this evidence would matter for the team's most important decisions), and a one-sentence rationale. Order by usefulness.
 
-For each opportunity, also give 1-2 concrete EXAMPLES of how the team could actually measure it, in the "examples" array. Rules for examples:
+For each opportunity, also give ONE concrete EXAMPLE of how the team could actually measure it, in the "examples" array (a single-item array). Rules for the example:
 - SPECIFIC, not generic. Name the actual instrument, comparison, or data source and tie it to THIS product's construct and the data the founder described (e.g., "a 6-item self-report on constructive-disagreement confidence, given at signup and again after 8 weeks, compared against in-app debate-completion logs"). Never write a generic method like "run a pre/post survey" or "do a study" with no specifics.
-- ILLUSTRATIVE, not prescriptive. Frame each as one possibility, beginning with phrasing like "One way could be…" or "For example, a team at your stage might…". It is an example of how this could be done, not THE answer.
+- ILLUSTRATIVE, not prescriptive. Frame it as one possibility, beginning with phrasing like "One way could be…" or "For example, a team at your stage might…". It is an example of how this could be done, not THE answer.
 - CALIBRATED to their measurement capacity score. Do not propose an RCT, a control group, or a data pipeline to a team whose analytic-skill or data-infrastructure score is low; propose the lightest credible design that would still answer the question. Reserve heavier designs for teams whose capacity supports them.
-- A SECOND example only when it is a genuinely different tradeoff — e.g., a quick, lightweight read versus a more rigorous design. If a second example would just restate the first, give only one.
+- Keep it to one tight sentence.
 - If you cannot state a concrete, specific example for an opportunity, return an empty array for "examples" rather than inventing generic filler.
 
 Keep all text tight. Output ONLY this JSON shape:
@@ -94,7 +94,7 @@ Keep all text tight. Output ONLY this JSON shape:
   "capacityLimiter":"analytic skill|data infrastructure|budget",
   "capacityNext":"one sentence: what moving the limiting component up one level would look like"
  },
- "opportunities":[{"title":"...","question":"...","type":"know|prove","impact":"low|medium|high","rationale":"one sentence","examples":["specific, illustrative, capacity-matched way to measure this; 1-2 items, or [] if none can be stated concretely"]}],
+ "opportunities":[{"title":"...","question":"...","type":"know|prove","impact":"low|medium|high","rationale":"one sentence","examples":["one specific, illustrative, capacity-matched, one-sentence way to measure this; single-item array, or [] if none can be stated concretely"]}],
  "emailSummary":"3-4 sentence plain-text summary the founder could paste into an email to Cobalt to start a conversation."
 }`;
 
@@ -564,7 +564,7 @@ function Deliverable({ d }) {
 
       <div>
         <h2 className="text-lg font-bold mb-1" style={{ color: INK }}>Where measurement could help</h2>
-        <p className="text-xs mb-3" style={{ color: "#9CA3AF" }}>Tap a question to see why it matters and an example or two of how you could measure it.</p>
+        <p className="text-xs mb-3" style={{ color: "#9CA3AF" }}>Tap a question to see why it matters and an example of how you could measure it.</p>
         <div className="space-y-2">
           {(d.opportunities || []).map((o, i) => {
             const isOpen = !!expanded[i];
