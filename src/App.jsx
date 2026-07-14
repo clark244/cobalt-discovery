@@ -734,9 +734,14 @@ export default function App() {
     setError("");
     try {
       const transcript = messages.map((m) => `${m.role === "user" ? "FOUNDER" : "GUIDE"}: ${m.content}`).join("\n\n");
-      const parseJson = (raw) => {
-        const clean = raw.replace(/```json/g, "").replace(/```/g, "").trim();
-        return JSON.parse(clean.slice(clean.indexOf("{"), clean.lastIndexOf("}") + 1));
+      const parseJson = (raw, label) => {
+        try {
+          const clean = raw.replace(/```json/g, "").replace(/```/g, "").trim();
+          return JSON.parse(clean.slice(clean.indexOf("{"), clean.lastIndexOf("}") + 1));
+        } catch (err) {
+          console.error(`[generate] JSON parse failed for "${label}". Raw response was:`, raw);
+          throw err;
+        }
       };
       // Split into two calls so neither one runs long enough to hit Netlify's request timeout.
       // Call 1: causal model + maturity scores.
@@ -745,20 +750,21 @@ export default function App() {
         [{ role: "user", content: `Discovery conversation:\n\n${transcript}\n\nProduce the model + maturity JSON.` }],
         1100
       );
-      const modelPart = parseJson(modelRaw);
+      const modelPart = parseJson(modelRaw, "model");
       // Call 2: opportunities, grounded in the model + capacity scores from call 1 (keeps examples calibrated).
       const oppsRaw = await callClaude(
         SYNTH_OPPS_SYSTEM,
         [{ role: "user", content: `Discovery conversation:\n\n${transcript}\n\nDerived causal model and maturity scores:\n\n${JSON.stringify({ model: modelPart.model, maturity: modelPart.maturity })}\n\nProduce the opportunities JSON.` }],
         900
       );
-      const oppsPart = parseJson(oppsRaw);
+      const oppsPart = parseJson(oppsRaw, "opportunities");
       const parsed = { ...modelPart, ...oppsPart };
       setDeliverable(parsed);
       setPhase(3); // Your results
       saveSession(parsed); // observability: log the full session for reviewer feedback
 
     } catch (e) {
+      console.error("[generate] failed:", e);
       setError("Couldn't assemble the model — try generating once more.");
     } finally {
       setGenerating(false);
