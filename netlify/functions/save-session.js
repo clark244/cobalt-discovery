@@ -75,6 +75,32 @@ export default async (req) => {
     });
     const sheets = google.sheets({ version: "v4", auth });
 
+    // Lightweight "signal" rows (traffic source, or a volunteered email) go to a
+    // separate "Signals" tab so they never collide with the Sheet1 session columns.
+    // Signals tab header: timestamp | sessionId | reviewer | kind | referrer | utm | email
+    if (body.type === "signal") {
+      const srow = [
+        body.timestamp || new Date().toISOString(),
+        body.sessionId || "",
+        body.reviewer || "",
+        body.kind || "",
+        body.referrer || "",
+        body.utm || "",
+        body.email || "",
+      ];
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: sheetId,
+        range: "Signals!A:G",
+        valueInputOption: "RAW",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: { values: [srow] },
+      });
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const m = body.model || {};
     const maturity = m.maturity || {};
 
