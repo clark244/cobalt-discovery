@@ -111,7 +111,7 @@ const SYNTH_OPPS_SYSTEM = `You are Cobalt Collective's analyst. You are given a 
 
 Use the causal model to locate where evidence is weakest (the "assumed" links are the honest gaps), and use the capacity scores you are given (analyticSkill, dataInfrastructure, budget, and the overall capacity) to calibrate how heavy each suggested measurement approach can realistically be.
 
-Give 3-4 prioritized measurement opportunities. Each: a plain-English question it answers, type "know" or "prove" (know = evidence that helps the team improve the product; prove = evidence for an external buyer or funder), impact "low"/"medium"/"high" (how much this evidence would matter for the team's most important decisions), and a one-sentence rationale. Order by usefulness.
+Give the 3 most useful prioritized measurement opportunities (exactly 3). Each: a plain-English question it answers (one sentence), type "know" or "prove" (know = evidence that helps the team improve the product; prove = evidence for an external buyer or funder), impact "low"/"medium"/"high" (how much this evidence would matter for the team's most important decisions), and a one-sentence rationale. Order by usefulness.
 
 For each opportunity, also give ONE concrete EXAMPLE of how the team could actually measure it, in the "examples" array (a single-item array). Rules for the example:
 - SPECIFIC, not generic. Name the actual instrument, comparison, or data source and tie it to THIS product's construct and the data the founder described (e.g., "a 6-item self-report on constructive-disagreement confidence, given at signup and again after 8 weeks, compared against in-app debate-completion logs"). Never write a generic method like "run a pre/post survey" or "do a study" with no specifics.
@@ -768,14 +768,14 @@ export default function App() {
       const modelRaw = await callClaude(
         SYNTH_MODEL_SYSTEM,
         [{ role: "user", content: `Discovery conversation:\n\n${transcript}\n\nProduce the model + maturity JSON.` }],
-        1100
+        1300
       );
       const modelPart = parseJson(modelRaw, "model");
       // Call 2: opportunities, grounded in the model + capacity scores from call 1 (keeps examples calibrated).
       const oppsRaw = await callClaude(
         SYNTH_OPPS_SYSTEM,
         [{ role: "user", content: `Discovery conversation:\n\n${transcript}\n\nDerived causal model and maturity scores:\n\n${JSON.stringify({ model: modelPart.model, maturity: modelPart.maturity })}\n\nProduce the opportunities JSON.` }],
-        900
+        1500
       );
       const oppsPart = parseJson(oppsRaw, "opportunities");
       const parsed = { ...modelPart, ...oppsPart };
