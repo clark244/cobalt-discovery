@@ -37,7 +37,7 @@ STYLE:
 WHEN YOU HAVE ENOUGH (a working read on the causal chain, who needs evidence and for what decision, and all three capacity components): give a brief, friendly reflect-back of your understanding in 3-4 sentences, then on its own final line output exactly: [[READY]]
 Do not output [[READY]] before you have a real read on all four areas.`;
 
-const SYNTH_SYSTEM = `You are Cobalt Collective's analyst. Read the discovery conversation and produce a draft deliverable as STRICT JSON only — no markdown, no backticks, no preamble.
+const SYNTH_MODEL_SYSTEM = `You are Cobalt Collective's analyst. Read the discovery conversation and produce PART 1 of a draft deliverable — the causal model and maturity scores — as STRICT JSON only, no markdown, no backticks, no preamble.
 
 Use Cobalt's causal chain: product → [implementation mechanism] → user behavior → [intervention mechanism] → outcome. Mark each element "confirmed" if the conversation gave real evidence it's understood, or "assumed" if it's plausible but untested/vague (the honest amber flag).
 
@@ -64,15 +64,6 @@ Budget (the axis is a STRATEGIC SHIFT from external/grant-dependent → internal
 - clarityNext: one sentence naming the concrete gap between the current clarity level and the next. If at level 5, say the theory is operationalized and name what to sustain.
 - For capacity: identify the LOWEST-scoring component (if two tie for lowest, name both). capacityLimiter is that component's name ("analytic skill" | "data infrastructure" | "budget"). capacityNext: one sentence naming what moving that component up one level would look like, in the rubric's terms, and noting it would raise the overall average.
 
-Give 3-4 prioritized measurement opportunities. Each: a plain-English question it answers, type "know" or "prove" (know = evidence that helps the team improve the product; prove = evidence for an external buyer or funder), impact "low"/"medium"/"high" (how much this evidence would matter for the team's most important decisions), and a one-sentence rationale. Order by usefulness.
-
-For each opportunity, also give ONE concrete EXAMPLE of how the team could actually measure it, in the "examples" array (a single-item array). Rules for the example:
-- SPECIFIC, not generic. Name the actual instrument, comparison, or data source and tie it to THIS product's construct and the data the founder described (e.g., "a 6-item self-report on constructive-disagreement confidence, given at signup and again after 8 weeks, compared against in-app debate-completion logs"). Never write a generic method like "run a pre/post survey" or "do a study" with no specifics.
-- ILLUSTRATIVE, not prescriptive. Frame it as one possibility, beginning with phrasing like "One way could be…" or "For example, a team at your stage might…". It is an example of how this could be done, not THE answer.
-- CALIBRATED to their measurement capacity score. Do not propose an RCT, a control group, or a data pipeline to a team whose analytic-skill or data-infrastructure score is low; propose the lightest credible design that would still answer the question. Reserve heavier designs for teams whose capacity supports them.
-- Keep it to one tight sentence.
-- If you cannot state a concrete, specific example for an opportunity, return an empty array for "examples" rather than inventing generic filler.
-
 Keep all text tight. Output ONLY this JSON shape:
 {
  "company":"short name or 'Your product'",
@@ -93,7 +84,24 @@ Keep all text tight. Output ONLY this JSON shape:
   "capacityNote":"one sentence on the current capacity picture across the three components",
   "capacityLimiter":"analytic skill|data infrastructure|budget",
   "capacityNext":"one sentence: what moving the limiting component up one level would look like"
- },
+ }
+}`;
+
+const SYNTH_OPPS_SYSTEM = `You are Cobalt Collective's analyst. You are given a discovery conversation AND the already-derived causal model and maturity scores for this company (as JSON). Produce PART 2 of the deliverable — the measurement opportunities — as STRICT JSON only, no markdown, no backticks, no preamble.
+
+Use the causal model to locate where evidence is weakest (the "assumed" links are the honest gaps), and use the capacity scores you are given (analyticSkill, dataInfrastructure, budget, and the overall capacity) to calibrate how heavy each suggested measurement approach can realistically be.
+
+Give 3-4 prioritized measurement opportunities. Each: a plain-English question it answers, type "know" or "prove" (know = evidence that helps the team improve the product; prove = evidence for an external buyer or funder), impact "low"/"medium"/"high" (how much this evidence would matter for the team's most important decisions), and a one-sentence rationale. Order by usefulness.
+
+For each opportunity, also give ONE concrete EXAMPLE of how the team could actually measure it, in the "examples" array (a single-item array). Rules for the example:
+- SPECIFIC, not generic. Name the actual instrument, comparison, or data source and tie it to THIS product's construct and the data the founder described (e.g., "a 6-item self-report on constructive-disagreement confidence, given at signup and again after 8 weeks, compared against in-app debate-completion logs"). Never write a generic method like "run a pre/post survey" or "do a study" with no specifics.
+- ILLUSTRATIVE, not prescriptive. Frame it as one possibility, beginning with phrasing like "One way could be…" or "For example, a team at your stage might…". It is an example of how this could be done, not THE answer.
+- CALIBRATED to the capacity scores you were given. Do not propose an RCT, a control group, or a data pipeline to a team whose analytic-skill or data-infrastructure score is low; propose the lightest credible design that would still answer the question. Reserve heavier designs for teams whose capacity supports them.
+- Keep it to one tight sentence.
+- If you cannot state a concrete, specific example for an opportunity, return an empty array for "examples" rather than inventing generic filler.
+
+Keep all text tight. Output ONLY this JSON shape:
+{
  "opportunities":[{"title":"...","question":"...","type":"know|prove","impact":"low|medium|high","rationale":"one sentence","examples":["one specific, illustrative, capacity-matched, one-sentence way to measure this; single-item array, or [] if none can be stated concretely"]}],
  "emailSummary":"3-4 sentence plain-text summary the founder could paste into an email to Cobalt to start a conversation."
 }`;
@@ -726,9 +734,26 @@ export default function App() {
     setError("");
     try {
       const transcript = messages.map((m) => `${m.role === "user" ? "FOUNDER" : "GUIDE"}: ${m.content}`).join("\n\n");
-      const raw = await callClaude(SYNTH_SYSTEM, [{ role: "user", content: `Discovery conversation:\n\n${transcript}\n\nProduce the JSON deliverable.` }], 1500);
-      const clean = raw.replace(/```json/g, "").replace(/```/g, "").trim();
-      const parsed = JSON.parse(clean.slice(clean.indexOf("{"), clean.lastIndexOf("}") + 1));
+      const parseJson = (raw) => {
+        const clean = raw.replace(/```json/g, "").replace(/```/g, "").trim();
+        return JSON.parse(clean.slice(clean.indexOf("{"), clean.lastIndexOf("}") + 1));
+      };
+      // Split into two calls so neither one runs long enough to hit Netlify's request timeout.
+      // Call 1: causal model + maturity scores.
+      const modelRaw = await callClaude(
+        SYNTH_MODEL_SYSTEM,
+        [{ role: "user", content: `Discovery conversation:\n\n${transcript}\n\nProduce the model + maturity JSON.` }],
+        1100
+      );
+      const modelPart = parseJson(modelRaw);
+      // Call 2: opportunities, grounded in the model + capacity scores from call 1 (keeps examples calibrated).
+      const oppsRaw = await callClaude(
+        SYNTH_OPPS_SYSTEM,
+        [{ role: "user", content: `Discovery conversation:\n\n${transcript}\n\nDerived causal model and maturity scores:\n\n${JSON.stringify({ model: modelPart.model, maturity: modelPart.maturity })}\n\nProduce the opportunities JSON.` }],
+        900
+      );
+      const oppsPart = parseJson(oppsRaw);
+      const parsed = { ...modelPart, ...oppsPart };
       setDeliverable(parsed);
       setPhase(3); // Your results
       saveSession(parsed); // observability: log the full session for reviewer feedback
