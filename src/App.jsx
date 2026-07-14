@@ -1005,14 +1005,7 @@ export default function App() {
             <CobaltLogo size={48} />
             <h2 className="mt-4 text-lg font-bold" style={{ color: INK }}>Cobalt Impact Discovery</h2>
             <p className="mt-3 text-sm max-w-md" style={{ color: "#4B5563" }}>
-              Cobalt Collective helps early-stage education, health, and workforce teams build impact measurement into how they work — so they can make solutions that genuinely serve their users.
-            </p>
-            <p className="mt-2 text-sm max-w-sm" style={{ color: "#6B7280" }}>
-              A short conversation to map how your solution creates impact — and where measuring it could help most. Takes about 5–10 minutes.
-            </p>
-
-            <p className="mt-4 text-[13px] max-w-sm" style={{ color: "#9CA3AF" }}>
-              You're part of an invited review group. Your name just helps us follow up on your feedback.
+              Cobalt Collective helps early-stage education, health, and workforce teams build impact measurement into how they work. In a short conversation (about 5–10 minutes), we'll map how your solution creates impact — and where measuring it could help most.
             </p>
             <input
               value={nameInput}
