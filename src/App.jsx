@@ -14,6 +14,26 @@ const LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAAB/CAYAAAAn+soH
 const GREETING =
   "Hi — I'm Cobalt's discovery guide. In a short conversation I'll help you map how your product is meant to create impact, and where measuring it could actually move the needle for you.\n\nThere are no wrong answers, and you can be as rough as you like — I'll ask follow-ups where it helps. At the end, I'll share some ideas about how impact measurement could help your organization, your solution, and your users.\n\nTo start: in a sentence or two, what does your product do, and who uses it?";
 
+// Dev-only: a complete sample conversation so the Generate step can be tested
+// without typing a full discovery each time. Surfaced only when the URL has ?dev=1.
+const DEV_TRANSCRIPT = [
+  { role: "assistant", content: GREETING },
+  { role: "user", content: "It's an online, text-based platform for constructive disagreement between two students, with an AI facilitating the conversation." },
+  { role: "assistant", content: "Interesting — structured disagreement as the learning mechanism. Who are the students, and is this teacher-assigned or something they come to on their own?" },
+  { role: "user", content: "Higher ed now, extending to K-12. It's best for civics, social studies, ELA, and SEL. Teachers assign it, tied to what they're covering in class." },
+  { role: "assistant", content: "So the teacher is the real adopter and the students are the ones in the conversation. What's the core outcome you're trying to drive?" },
+  { role: "user", content: "Durable skills for constructive disagreement — students who are more comfortable engaging people they disagree with and who reason more carefully." },
+  { role: "assistant", content: "What are students actually doing on the platform that's supposed to build that skill?" },
+  { role: "user", content: "They debate a real peer while an AI guide gives charitable rephrasing, feedback, and challenges — deliberate practice with a scaffold right there in the exchange." },
+  { role: "assistant", content: "That's clear for what happens in-platform. The harder link is transfer — what makes them better at disagreement outside the tool?" },
+  { role: "user", content: "It's like sports practice — it builds skills that should show up in real face-to-face and text conversations. Honestly that transfer is still largely unproven for us." },
+  { role: "assistant", content: "Honest answer. Who actually needs evidence that this works, and for what decision?" },
+  { role: "user", content: "Educators deciding whether to assign it, and funders deciding whether to back the K-12 expansion." },
+  { role: "assistant", content: "Got it. On capacity — do you have people who could design and run a study, data coming off the platform, and budget for the work?" },
+  { role: "user", content: "We have researchers on the team and rich platform data — behavior traces, process data, end-of-chat comprehension quizzes. We also have some internal budget we could commit. Funding scale is still the main constraint, but we have partner schools." },
+  { role: "assistant", content: "Strong position — people, data, partners, and some committed budget, with funding scale as the binding constraint. Here's my read: your platform builds constructive-disagreement skill through practice plus real-time AI coaching; educators and funders are the evidence audience; and the transfer from platform to real-world conversation is the hardest link to demonstrate. Does that land?" },
+];
+
 const CONVO_SYSTEM = `You are Cobalt Collective's discovery guide, talking with a founder or product lead at an early-stage company in education, health, or workforce. Your job is to run Cobalt's discovery process conversationally and warmly, then hand off to a synthesis step.
 
 CORE FRAMES you are working toward (do not lecture about these — use them to steer your questions):
@@ -782,6 +802,19 @@ export default function App() {
     setPhase(0);
   };
 
+  // Dev-only shortcut (URL ?dev=1): skip the manual chat and jump straight to Generate
+  // with a full sample conversation preloaded. Never shown to real users.
+  const devMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("dev") === "1";
+  const loadDevConversation = () => {
+    setReviewer("DEV");
+    setStarted(true);
+    setMessages(DEV_TRANSCRIPT);
+    setReady(true);
+    setPhase(2);
+    setDeliverable(null);
+    setError("");
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 flex justify-center p-3 sm:p-6">
       <div className="w-full max-w-2xl bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col" style={{ height: "88vh" }}>
@@ -827,6 +860,15 @@ export default function App() {
             >
               Start →
             </button>
+            {devMode && (
+              <button
+                onClick={loadDevConversation}
+                className="mt-4 text-[11px] underline"
+                style={{ color: "#9CA3AF" }}
+              >
+                Load sample conversation (dev) →
+              </button>
+            )}
           </div>
         ) : (
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 space-y-3">
