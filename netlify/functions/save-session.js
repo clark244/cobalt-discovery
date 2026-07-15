@@ -11,6 +11,10 @@
 //   timestamp | sessionId | reviewer | messageCount | transcript | model_json | clarity | capacity
 
 import { google } from "googleapis";
+import { bump, clientIp } from "./_ratelimit.js";
+import { sendCompletionEmail } from "./_notify.js";
+
+const SESSION_WRITES_PER_DAY = Number(process.env.SESSION_WRITES_PER_DAY || 5);
 
 export default async (req) => {
   if (req.method !== "POST") {
@@ -101,6 +105,16 @@ export default async (req) => {
       });
     }
 
+    // Defense against direct pollution of the sheet (this endpoint is publicly
+    // callable on its own, not only via the app). Signals are exempt; only full
+    // session rows are capped. See _ratelimit.js for the shared-IP caveat.
+    const writeGate = await bump("write", clientIp(req), SESSION_WRITES_PER_DAY);
+    if (!writeGate.ok) {
+      return new Response(JSON.stringify({ error: "Daily session limit reached." }), {
+        status: 429, headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const m = body.model || {};
     const maturity = m.maturity || {};
 
@@ -121,6 +135,17 @@ export default async (req) => {
       valueInputOption: "RAW",
       insertDataOption: "INSERT_ROWS",
       requestBody: { values: [row] },
+    });
+
+    // Alert on every completed session (best-effort — never blocks the save).
+    await sendCompletionEmail({
+      sessionId: body.sessionId,
+      reviewer: body.reviewer,
+      ip: clientIp(req),
+      messageCount: body.messageCount,
+      model: body.model,
+      transcript: body.transcript,
+      timestamp: body.timestamp || new Date().toISOString(),
     });
 
     return new Response(JSON.stringify({ ok: true }), {
