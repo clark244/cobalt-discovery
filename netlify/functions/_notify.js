@@ -16,6 +16,7 @@ const esc = (v) =>
 export async function sendCompletionEmail({
   sessionId,
   reviewer,
+  account,
   ip,
   messageCount,
   model,
@@ -46,6 +47,7 @@ export async function sendCompletionEmail({
     <h2 style="margin:0 0 10px">New completed discovery session</h2>
     <table style="border-collapse:collapse;font-size:13px">
       ${row("Company", esc(company))}
+      ${row("Verified email", esc(account) || "<em>none</em>")}
       ${row("Name entered", esc(reviewer) || "<em>none</em>")}
       ${row("Clarity", esc(mat.clarity))}
       ${row("Capacity", esc(mat.capacity))}
@@ -57,7 +59,7 @@ export async function sendCompletionEmail({
     <p style="margin:14px 0 4px;color:#666">Transcript preview</p>
     <pre style="white-space:pre-wrap;background:#f6f6f6;padding:10px;border-radius:6px;font-size:12px;max-width:640px">${esc(preview)}${truncated}</pre>
     <p style="margin-top:12px"><a href="${SHEET_URL}">Open the results sheet →</a></p>
-    <p style="color:#999;font-size:11px;margin-top:16px">Note: "Name entered" is a free-text field and can be spoofed. IP is the best available identifier until accounts exist. Several of these arriving in a short window is the burst signature to watch for.</p>
+    <p style="color:#999;font-size:11px;margin-top:16px">Note: "Name entered" is a free-text field and can be spoofed. The verified email is now the primary identifier; IP is secondary. Several of these arriving in a short window is the burst signature to watch for.</p>
   </div>`;
 
   try {

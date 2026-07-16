@@ -13,6 +13,7 @@
 import { google } from "googleapis";
 import { bump, clientIp } from "./_ratelimit.js";
 import { sendCompletionEmail } from "./_notify.js";
+import { verifiedEmail } from "./_auth.js";
 
 const SESSION_WRITES_PER_DAY = Number(process.env.SESSION_WRITES_PER_DAY || 5);
 
@@ -30,6 +31,16 @@ export default async (req) => {
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  // Email gate: this endpoint is publicly callable on its own, so the token —
+  // not the app UI — is what protects the sheet. No verified email, no write.
+  const auth = verifiedEmail(req);
+  if (!auth) {
+    return new Response(JSON.stringify({ error: "Verify your email to begin." }), {
+      status: 401, headers: { "Content-Type": "application/json" },
+    });
+  }
+  const acct = auth.email;
 
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const sheetId = process.env.GOOGLE_SHEET_ID;
@@ -108,7 +119,7 @@ export default async (req) => {
     // Defense against direct pollution of the sheet (this endpoint is publicly
     // callable on its own, not only via the app). Signals are exempt; only full
     // session rows are capped. See _ratelimit.js for the shared-IP caveat.
-    const writeGate = await bump("write", clientIp(req), SESSION_WRITES_PER_DAY);
+    const writeGate = await bump("write", acct, SESSION_WRITES_PER_DAY);
     if (!writeGate.ok) {
       return new Response(JSON.stringify({ error: "Daily session limit reached." }), {
         status: 429, headers: { "Content-Type": "application/json" },
@@ -141,6 +152,7 @@ export default async (req) => {
     await sendCompletionEmail({
       sessionId: body.sessionId,
       reviewer: body.reviewer,
+      account: acct,
       ip: clientIp(req),
       messageCount: body.messageCount,
       model: body.model,
