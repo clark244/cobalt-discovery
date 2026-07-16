@@ -8,7 +8,7 @@
 //   GOOGLE_SHEET_ID               — the spreadsheet ID (from its URL)
 //
 // The target sheet should have a header row:
-//   timestamp | sessionId | reviewer | messageCount | transcript | model_json | clarity | capacity
+//   timestamp | sessionId | reviewer | messageCount | transcript | model_json | clarity | capacity | email
 
 import { google } from "googleapis";
 import { bump, clientIp } from "./_ratelimit.js";
@@ -138,11 +138,12 @@ export default async (req) => {
       JSON.stringify(body.model || {}),
       maturity.clarity ?? "",
       maturity.capacity ?? "",
+      acct, // verified email (column I)
     ];
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: "Sheet1!A:H",
+      range: "Sheet1!A:I",
       valueInputOption: "RAW",
       insertDataOption: "INSERT_ROWS",
       requestBody: { values: [row] },
