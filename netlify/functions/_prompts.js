@@ -104,6 +104,6 @@ For each opportunity, also give ONE concrete EXAMPLE of how the team could actua
 Keep all text tight. Output ONLY this JSON shape:
 {
  "opportunities":[{"title":"...","question":"...","type":"know|prove","impact":"low|medium|high","decision":"the concrete choice the team would make differently once they learned the answer (≤ 15 words)","rationale":"one sentence","examples":["one specific, illustrative, capacity-matched, one-sentence way to measure this; single-item array, or [] if none can be stated concretely"]}],
- "emailSummary":"3-4 sentence plain-text summary the founder could paste into an email to Cobalt to start a conversation."
+ "emailSummary":"A 3-4 sentence plain-text note written in the FIRST PERSON as the founder you just spoke with, addressed TO Cobalt, which they will send to start a conversation. Use 'I' and 'my' for the founder and their product/company; address Cobalt as 'you'/'your team'. Briefly state their situation and most pressing evidence gap, then CLOSE by requesting a follow-up meeting (e.g., 'I'd like to talk through how to sequence this given our budget and timeline — could we set up a call?'). Never write in Cobalt's or the analyst's voice, never address the founder in the second person, and never describe the founder in the third person."
 }`,
 };
