@@ -327,6 +327,7 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
     const AMBER_RGB = [217, 119, 6];
     const INK_RGB = [31, 41, 55];
     const GRAY_RGB = [107, 114, 128];
+    const GREEN_RGB = [21, 128, 61];
 
     const ensureSpace = (needed) => {
       if (y + needed > pageH - margin) { doc.addPage(); y = margin; }
@@ -480,10 +481,6 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
       text(`"${o.question}"`, margin + 12, { size: 9.5, color: [55, 65, 81], style: "italic", maxW: contentW - 12 });
       gap(1);
       text(o.rationale || "", margin + 12, { size: 9, color: GRAY_RGB, maxW: contentW - 12 });
-      if (o.decision) {
-        gap(2);
-        text(`If you learned this: ${o.decision}`, margin + 12, { size: 8.5, color: AMBER_RGB, style: "italic", maxW: contentW - 12 });
-      }
       if (Array.isArray(o.examples) && o.examples.length > 0) {
         gap(3);
         text("How you could measure it:", margin + 12, { size: 8.5, color: COBALT_RGB, style: "bold", maxW: contentW - 12 });
@@ -491,6 +488,10 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
           gap(1);
           text(`-  ${ex}`, margin + 18, { size: 8.5, color: [55, 65, 81], maxW: contentW - 18 });
         });
+      }
+      if (o.decision) {
+        gap(3);
+        text(`If you learned this: ${o.decision}`, margin + 12, { size: 8.5, color: GREEN_RGB, style: "italic", maxW: contentW - 12 });
       }
       gap(8);
     });
@@ -514,23 +515,61 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
   };
 
   // Download the full conversation transcript (reasoning trail, including the
-  // user's own answers) as a plain-text file.
+  // user's own answers) as a PDF.
   const downloadTranscript = () => {
-    const lines = (messages || []).map((mm) =>
-      `${mm.role === "user" ? "You" : "Guide"}:\n${mm.content}\n`
-    );
-    const header = `Cobalt Impact Discovery — conversation transcript\n${new Date().toLocaleString()}\n\n`;
-    const blob = new Blob([header + lines.join("\n")], { type: "text/plain;charset=utf-8" });
+    const doc = new jsPDF({ unit: "pt", format: "letter" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 54;
+    const contentW = pageW - margin * 2;
+    let y = margin;
+
+    const COBALT_RGB = [59, 130, 246];
+    const INK_RGB = [31, 41, 55];
+    const GRAY_RGB = [107, 114, 128];
+
+    // jsPDF's Helvetica mangles many Unicode characters; convert to ASCII first.
+    const asciiSafe = (str) =>
+      String(str == null ? "" : str)
+        .replace(/[→➔➡⮕]/g, "->")
+        .replace(/[←]/g, "<-")
+        .replace(/[–—]/g, "-")
+        .replace(/[‘’‚‛]/g, "'")
+        .replace(/[“”„‟]/g, '"')
+        .replace(/[•●▪·]/g, "-")
+        .replace(/[…]/g, "...");
+
+    const ensureSpace = (needed) => {
+      if (y + needed > pageH - margin) { doc.addPage(); y = margin; }
+    };
+    const draw = (str, { size = 10, color = INK_RGB, style = "normal", indent = 0 } = {}) => {
+      doc.setFont("helvetica", style);
+      doc.setFontSize(size);
+      doc.setTextColor(color[0], color[1], color[2]);
+      const wrapped = doc.splitTextToSize(asciiSafe(str), contentW - indent);
+      wrapped.forEach((ln) => {
+        ensureSpace(size * 1.35);
+        doc.text(ln, margin + indent, y);
+        y += size * 1.35;
+      });
+    };
+
+    draw("Cobalt Impact Discovery - conversation transcript", { size: 14, color: INK_RGB, style: "bold" });
+    y += 4;
+    draw(new Date().toLocaleString(), { size: 9, color: GRAY_RGB });
+    y += 12;
+
+    (messages || []).forEach((mm) => {
+      const isUser = mm.role === "user";
+      y += 6;
+      draw(isUser ? "You" : "Guide", { size: 9.5, color: isUser ? INK_RGB : COBALT_RGB, style: "bold" });
+      y += 1;
+      draw(mm.content || "", { size: 10, color: INK_RGB });
+    });
+
     const safeName = (d.company && d.company !== "Your product" ? d.company : "impact-model")
       .replace(/[^a-z0-9]+/gi, "-").toLowerCase().replace(/^-+|-+$/g, "");
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `cobalt-${safeName}-conversation.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    doc.save(`cobalt-${safeName}-conversation.pdf`);
   };
 
   const m = d.model || {};
@@ -545,7 +584,7 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
                 onClick={downloadTranscript}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border"
                 style={{ color: COBALT, borderColor: "#BFDBFE", background: "white" }}
-                title="Download the full conversation transcript"
+                title="Download the full conversation transcript as a PDF"
               >
                 ⬇ Download conversation
               </button>
@@ -678,12 +717,6 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
                 {isOpen && (
                   <div className="px-3 pb-3 pl-9 space-y-2">
                     <p className="text-xs" style={{ color: "#6B7280" }}>{o.rationale}</p>
-                    {o.decision && (
-                      <div className="rounded-lg p-2.5" style={{ background: "#FFF7ED" }}>
-                        <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: AMBER }}>If you learned this</div>
-                        <p className="text-xs" style={{ color: "#374151" }}>{o.decision}</p>
-                      </div>
-                    )}
                     {hasExamples && (
                       <div className="rounded-lg p-2.5" style={{ background: "#F8FAFC" }}>
                         <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: COBALT }}>How you could measure it</div>
@@ -695,6 +728,12 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
                             </li>
                           ))}
                         </ul>
+                      </div>
+                    )}
+                    {o.decision && (
+                      <div className="rounded-lg p-2.5" style={{ background: "#F0FDF4" }}>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: "#15803D" }}>If you learned this</div>
+                        <p className="text-xs" style={{ color: "#374151" }}>{o.decision}</p>
                       </div>
                     )}
                   </div>
