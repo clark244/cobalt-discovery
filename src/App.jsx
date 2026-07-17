@@ -5,6 +5,19 @@ import { jsPDF } from "jspdf";
 const COBALT = "#3B82F6";
 const INK = "#1F2937";
 const AMBER = "#D97706";
+// Impact chip color-coding: single-hue cobalt intensity ramp (high -> low).
+// Values arrive from the model at runtime, so this is case-insensitive with a medium fallback.
+const impactChipStyle = (level) => {
+  switch (String(level || "").toLowerCase()) {
+    case "high":
+      return { color: COBALT, backgroundColor: "#EFF6FF", borderColor: "#93C5FD" };
+    case "low":
+      return { color: "#6B7280", borderColor: "#D1D5DB" };
+    case "medium":
+    default:
+      return { color: "#6B7280", borderColor: "#BFDBFE" };
+  }
+};
 // Where "Email Cobalt" outreach is sent. Change this to a shared inbox if desired.
 const COBALT_EMAIL = "clark@cobaltcollective.org";
 
@@ -743,7 +756,7 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
                     </div>
                     <div className="flex gap-1.5 shrink-0">
                       <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border"
-                        style={{ color: "#6B7280", borderColor: "#D1D5DB" }}>{o.impact || o.lift} impact</span>
+                        style={impactChipStyle(o.impact || o.lift)}>{o.impact || o.lift} impact</span>
                     </div>
                   </div>
                   {!isOpen && (
