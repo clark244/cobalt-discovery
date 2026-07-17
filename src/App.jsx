@@ -491,7 +491,7 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
     // Evidence-demand fit
     if (d.evidence?.demandFit) {
       ensureSpace(64);
-      text("Evidence-demand fit", margin, { size: 11, color: INK_RGB, style: "bold" });
+      text("How well your evidence matches what others expect", margin, { size: 11, color: INK_RGB, style: "bold" });
       gap(4);
       if (d.evidence?.audience || d.evidence?.standard) {
         const bits = [];
@@ -735,7 +735,7 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
 
       {(d.evidence?.demandFit || d.evidence?.standard) && (
         <div className="rounded-xl border p-4" style={{ borderColor: "#BFDBFE", background: "#F8FAFF" }}>
-          <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: INK }}>Evidence–demand fit</div>
+          <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: INK }}>How well your evidence matches what others expect</div>
           {(d.evidence?.audience || d.evidence?.standard) && (
             <p className="text-[11px] mb-1.5" style={{ color: "#6B7280" }}>
               {d.evidence?.audience && <>Who needs it: <span style={{ color: "#4B5563" }}>{d.evidence.audience}</span></>}
