@@ -432,20 +432,6 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
     });
     gap(8);
 
-    // Evidence type for the outcome
-    if (d.evidence?.type) {
-      ensureSpace(24);
-      const et = d.evidence.type;
-      const label = et === "both" ? "PROVE + KNOW" : et.toUpperCase();
-      const line = et === "know"
-        ? "This outcome mainly calls for improvement evidence the team uses to iterate."
-        : et === "prove"
-        ? "This outcome mainly calls for efficacy evidence a buyer or funder would weigh."
-        : "This outcome calls for both efficacy evidence for buyers/funders and improvement evidence for the team.";
-      text(`Evidence this outcome calls for [${label}]: ${line}`, margin, { size: 9, color: GRAY_RGB });
-      gap(10);
-    }
-
     // Maturity
     const mat = d.maturity || {};
     text("Maturity", margin, { size: 11, color: INK_RGB, style: "bold" });
@@ -509,7 +495,7 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
     gap(8);
     (d.opportunities || []).forEach((o, i) => {
       ensureSpace(56);
-      const badge = `[${(o.type || "").toUpperCase()} - ${(o.impact || o.lift || "")} impact]`;
+      const badge = `[${(o.impact || o.lift || "")} impact]`;
       text(`${i + 1}. ${o.title}   ${badge}`, margin, { size: 10.5, color: INK_RGB, style: "bold" });
       gap(2);
       text(`"${o.question}"`, margin + 12, { size: 9.5, color: [55, 65, 81], style: "italic", maxW: contentW - 12 });
@@ -648,24 +634,6 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
             <span className="font-semibold" style={{ color: "#6B7280" }}>Problem it aims to solve:</span> {d.problemStatement}
           </p>
         )}
-        {d.evidence?.type && (
-          <p className="text-[11px] mt-2 flex items-start gap-1.5" style={{ color: "#6B7280" }}>
-            <span className="font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border shrink-0"
-              style={{
-                color: d.evidence.type === "know" ? COBALT : AMBER,
-                borderColor: d.evidence.type === "know" ? "#BFDBFE" : "#FDE1B8",
-              }}>
-              {d.evidence.type === "both" ? "prove + know" : d.evidence.type}
-            </span>
-            <span>
-              {d.evidence.type === "know"
-                ? "This outcome mainly calls for improvement evidence the team uses to iterate."
-                : d.evidence.type === "prove"
-                ? "This outcome mainly calls for efficacy evidence a buyer or funder would weigh."
-                : "This outcome calls for both efficacy evidence for buyers/funders and improvement evidence for the team."}
-            </span>
-          </p>
-        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -756,7 +724,6 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
         <div className="space-y-2">
           {(d.opportunities || []).map((o, i) => {
             const isOpen = !!expanded[i];
-            const isProve = o.type === "prove";
             const hasExamples = Array.isArray(o.examples) && o.examples.length > 0;
             return (
               <div key={i} className="rounded-xl border border-slate-200 overflow-hidden transition-colors hover:border-blue-300">
@@ -775,8 +742,6 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
                       <span className="font-semibold text-sm" style={{ color: INK }}>{i + 1}. {o.question}</span>
                     </div>
                     <div className="flex gap-1.5 shrink-0">
-                      <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border"
-                        style={{ color: isProve ? AMBER : COBALT, borderColor: isProve ? "#FDE1B8" : "#BFDBFE" }}>{o.type}</span>
                       <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border"
                         style={{ color: "#6B7280", borderColor: "#D1D5DB" }}>{o.impact || o.lift} impact</span>
                     </div>
