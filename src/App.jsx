@@ -10,12 +10,12 @@ const AMBER = "#D97706";
 const impactChipStyle = (level) => {
   switch (String(level || "").toLowerCase()) {
     case "high":
-      return { color: COBALT, backgroundColor: "#EFF6FF", borderColor: "#93C5FD" };
+      return { color: "#1D4ED8", backgroundColor: "#DBEAFE", borderColor: "#60A5FA" };
     case "low":
       return { color: "#6B7280", borderColor: "#D1D5DB" };
     case "medium":
     default:
-      return { color: "#6B7280", borderColor: "#BFDBFE" };
+      return { color: "#3B82F6", backgroundColor: "#F4F8FE", borderColor: "#BFDBFE" };
   }
 };
 // Where "Email Cobalt" outreach is sent. Change this to a shared inbox if desired.
