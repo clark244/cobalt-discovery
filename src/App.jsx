@@ -377,6 +377,10 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
       text(d.reflectBack, margin, { size: 10, color: INK_RGB, style: "italic", lh: 1.4 });
       gap(14);
     }
+    if (d.problemStatement) {
+      text(`Problem it aims to solve: ${d.problemStatement}`, margin, { size: 9, color: GRAY_RGB, style: "italic" });
+      gap(10);
+    }
 
     // Impact Process Model
     text("Draft Impact Process Model", margin, { size: 13, color: INK_RGB, style: "bold" });
@@ -428,6 +432,20 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
     });
     gap(8);
 
+    // Evidence type for the outcome
+    if (d.evidence?.type) {
+      ensureSpace(24);
+      const et = d.evidence.type;
+      const label = et === "both" ? "PROVE + KNOW" : et.toUpperCase();
+      const line = et === "know"
+        ? "This outcome mainly calls for improvement evidence the team uses to iterate."
+        : et === "prove"
+        ? "This outcome mainly calls for efficacy evidence a buyer or funder would weigh."
+        : "This outcome calls for both efficacy evidence for buyers/funders and improvement evidence for the team.";
+      text(`Evidence this outcome calls for [${label}]: ${line}`, margin, { size: 9, color: GRAY_RGB });
+      gap(10);
+    }
+
     // Maturity
     const mat = d.maturity || {};
     text("Maturity", margin, { size: 11, color: INK_RGB, style: "bold" });
@@ -469,6 +487,22 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
       text(`To reach the next level: ${mat.capacityNext}`, margin, { size: 8.5, color: COBALT_RGB, style: "italic" });
     }
     gap(14);
+
+    // Evidence-demand fit
+    if (d.evidence?.demandFit) {
+      ensureSpace(64);
+      text("Evidence-demand fit", margin, { size: 11, color: INK_RGB, style: "bold" });
+      gap(4);
+      if (d.evidence?.audience || d.evidence?.standard) {
+        const bits = [];
+        if (d.evidence.audience) bits.push(`Who needs it: ${d.evidence.audience}`);
+        if (d.evidence.standard) bits.push(`Bar of proof: ${d.evidence.standard}`);
+        text(bits.join("   ·   "), margin, { size: 8.5, color: GRAY_RGB });
+        gap(3);
+      }
+      text(d.evidence.demandFit, margin, { size: 9.5, color: INK_RGB, lh: 1.4 });
+      gap(14);
+    }
 
     // Opportunities
     text("Where measurement could help", margin, { size: 13, color: INK_RGB, style: "bold" });
@@ -609,6 +643,29 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
           <Connector data={m.interventionMechanism} />
           <Node data={m.outcome} label="Outcome" />
         </div>
+        {d.problemStatement && (
+          <p className="text-[11px] mt-2" style={{ color: "#9CA3AF" }}>
+            <span className="font-semibold" style={{ color: "#6B7280" }}>Problem it aims to solve:</span> {d.problemStatement}
+          </p>
+        )}
+        {d.evidence?.type && (
+          <p className="text-[11px] mt-2 flex items-start gap-1.5" style={{ color: "#6B7280" }}>
+            <span className="font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border shrink-0"
+              style={{
+                color: d.evidence.type === "know" ? COBALT : AMBER,
+                borderColor: d.evidence.type === "know" ? "#BFDBFE" : "#FDE1B8",
+              }}>
+              {d.evidence.type === "both" ? "prove + know" : d.evidence.type}
+            </span>
+            <span>
+              {d.evidence.type === "know"
+                ? "This outcome mainly calls for improvement evidence the team uses to iterate."
+                : d.evidence.type === "prove"
+                ? "This outcome mainly calls for efficacy evidence a buyer or funder would weigh."
+                : "This outcome calls for both efficacy evidence for buyers/funders and improvement evidence for the team."}
+            </span>
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -675,6 +732,23 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
           )}
         </div>
       </div>
+
+      {(d.evidence?.demandFit || d.evidence?.standard) && (
+        <div className="rounded-xl border p-4" style={{ borderColor: "#BFDBFE", background: "#F8FAFF" }}>
+          <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: INK }}>Evidence–demand fit</div>
+          {(d.evidence?.audience || d.evidence?.standard) && (
+            <p className="text-[11px] mb-1.5" style={{ color: "#6B7280" }}>
+              {d.evidence?.audience && <>Who needs it: <span style={{ color: "#4B5563" }}>{d.evidence.audience}</span></>}
+              {d.evidence?.audience && d.evidence?.standard && " · "}
+              {d.evidence?.standard && <>Bar of proof: <span style={{ color: "#4B5563" }}>{d.evidence.standard}</span></>}
+            </p>
+          )}
+          {d.evidence?.demandFit && <p className="text-sm" style={{ color: "#374151" }}>{d.evidence.demandFit}</p>}
+          <p className="text-[11px] mt-2 italic" style={{ color: "#9CA3AF" }}>
+            Whether the evidence you can realistically produce matches what your buyer or funder expects — a read, not a score.
+          </p>
+        </div>
+      )}
 
       <div>
         <h2 className="text-lg font-bold mb-1" style={{ color: INK }}>Where measurement could help</h2>
