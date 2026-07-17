@@ -852,6 +852,27 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
   );
 }
 
+// Shown when the guide determines an org is outside Cobalt's education/health/
+// workforce focus. A warm dead-end — no assessment, no CTA — plus a safety
+// valve that resumes the chat if the guide misjudged the fit.
+function Offramp({ onResume }) {
+  return (
+    <div className="rounded-xl p-4" style={{ background: "#EFF4FF" }}>
+      <div className="text-[15px] font-bold" style={{ color: INK }}>
+        This tool is built for a different focus
+      </div>
+      <p className="text-[12px] leading-relaxed mt-1 mb-3" style={{ color: "#4B5563" }}>
+        Cobalt Collective works with early-stage education, health, and workforce
+        teams, so this discovery isn't the right fit for your work. Thanks for
+        stopping by.
+      </p>
+      <button onClick={onResume} className="text-[12px] font-semibold" style={{ color: COBALT }}>
+        Actually, my work is in education, health, or workforce — keep going
+      </button>
+    </div>
+  );
+}
+
 export default function App() {
   const [messages, setMessages] = useState([{ role: "assistant", content: GREETING }]);
   const [input, setInput] = useState("");
@@ -859,6 +880,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [deliverable, setDeliverable] = useState(null);
+  const [outOfScope, setOutOfScope] = useState(false); // guide bounced an out-of-scope org
   const [error, setError] = useState("");
   const [reviewer, setReviewer] = useState("");      // reviewer name/initials
   const [started, setStarted] = useState(false);     // false until name entered
@@ -909,6 +931,11 @@ export default function App() {
         reply = reply.replace(/\[\[READY\]\]/g, "").trim();
         setReady(true);
         setPhase((p) => (p < 2 ? 2 : p)); // ensure at least capacity phase by the time we're ready
+      }
+      if (reply.includes("[[OUTOFSCOPE]]")) {
+        reply = reply.replace(/\[\[OUTOFSCOPE\]\]/g, "").trim();
+        setOutOfScope(true);
+        saveSignal("out_of_scope"); // count the bounce (no transcript logged)
       }
       setMessages([...next, { role: "assistant", content: reply }]);
     } catch (e) {
@@ -1008,6 +1035,7 @@ export default function App() {
     setMessages([{ role: "assistant", content: GREETING }]);
     setReady(false);
     setDeliverable(null);
+    setOutOfScope(false);
     setError("");
     setInput("");
     setStarted(false);
@@ -1107,6 +1135,10 @@ export default function App() {
             </div>
           )}
 
+          {outOfScope && !deliverable && (
+            <div className="pt-1"><Offramp onResume={() => setOutOfScope(false)} /></div>
+          )}
+
           {generating && (
             <div className="flex flex-col items-center justify-center gap-3 py-10">
               <CobaltSpinner size={38} />
@@ -1120,7 +1152,7 @@ export default function App() {
         </div>
         )}
 
-        {started && !deliverable && !generating && (
+        {started && !deliverable && !generating && !outOfScope && (
           <div className="border-t border-slate-100 p-3">
             {ready && <p className="text-[11px] text-center mb-2" style={{ color: "#9CA3AF" }}>Want to add anything else before generating? Keep typing, or hit the button above.</p>}
             <div className="flex items-end gap-2">
