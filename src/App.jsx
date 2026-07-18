@@ -474,7 +474,7 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
     }
     gap(8);
     // Capacity
-    text(`Measurement capacity: ${mat.capacity ?? "-"} / 5`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
+    text(`Measurement capacity: ${mat.capacity != null ? Math.round(mat.capacity) : "-"} / 5`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
     gap(2);
     text(mat.capacityNote || "", margin, { size: 9, color: GRAY_RGB });
     if (mat.capacityComponents) {
@@ -561,9 +561,7 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
       gap(4);
       text("Cobalt Collective helps early-stage education, health, and workforce teams build impact measurement into operations to make effective solutions that serve their users well.", margin, { size: 8.5, color: GRAY_RGB });
       gap(6);
-      text(d.emailSummary || "", margin, { size: 9.5, color: INK_RGB });
-      gap(6);
-      text(`Reach out: ${COBALT_EMAIL}`, margin, { size: 9.5, color: COBALT_RGB, style: "bold" });
+      text("Book a meeting with Cobalt at calendly.com/clark-cobaltcollective — a member of the team will help you turn this into a plan. No cost, no obligation.", margin, { size: 9.5, color: COBALT_RGB, style: "bold" });
       gap(14);
     }
     text("This is a draft starting point, not a verdict. Cobalt builds these out with you.", margin, { size: 8, color: GRAY_RGB, style: "italic" });
@@ -716,11 +714,11 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
           <div className="flex items-center justify-between">
             <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: INK }}>Measurement capacity</div>
             <div className="text-xs font-bold" style={{ color: COBALT }}>
-              {d.maturity?.capacity ?? "–"}<span style={{ color: "#9CA3AF" }}> / 5</span>
+              {d.maturity?.capacity != null ? Math.round(d.maturity.capacity) : "–"}<span style={{ color: "#9CA3AF" }}> / 5</span>
               <InfoTip text={d.maturity?.capacityNext} />
             </div>
           </div>
-          <MaturityBar value={d.maturity?.capacity} />
+          <MaturityBar value={d.maturity?.capacity != null ? Math.round(d.maturity.capacity) : null} />
           <p className="text-xs mt-2" style={{ color: "#4B5563" }}>{d.maturity?.capacityNote}</p>
           {d.maturity?.capacityComponents && (
             <div className="mt-2 space-y-0.5">
@@ -861,49 +859,17 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
           Cobalt Collective helps early-stage education, health, and workforce teams build impact measurement into operations to make effective solutions that serve their users well.
         </p>
         <a
-          href={emailHref()}
+          href={COBALT_CALENDLY}
+          target="_blank"
+          rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg text-white"
           style={{ background: COBALT }}
         >
-          ✉️ Send my draft to Cobalt
+          📅 Book a meeting with Cobalt
         </a>
-        <p className="text-[12px] mt-3 mb-2" style={{ color: "#4B5563" }}>
-          This sends the summary below — a member of the Cobalt team will follow up. No cost, no obligation.
+        <p className="text-[12px] mt-3" style={{ color: "#4B5563" }}>
+          Book a short call — a member of the Cobalt team will help you turn this into a plan. No cost, no obligation.
         </p>
-        <div className="bg-white rounded-lg p-3" style={{ border: "1px solid #DBE7FB" }}>
-          <p className="text-[13px] leading-relaxed" style={{ color: INK }}>{d.emailSummary}</p>
-        </div>
-
-        <div className="mt-4 pt-3" style={{ borderTop: "1px solid #DBE7FB" }}>
-          {emailSaved ? (
-            <p className="text-[12px]" style={{ color: "#4B5563" }}>Thanks — we'll be in touch.</p>
-          ) : (
-            <>
-              <p className="text-[12px] mb-2" style={{ color: "#4B5563" }}>
-                Prefer we reach out? Leave your email for a follow-up or occasional updates from Cobalt (optional).
-              </p>
-              <div className="flex items-center gap-2 flex-wrap">
-                <input
-                  type="email"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") submitEmail(); }}
-                  placeholder="you@example.com"
-                  className="flex-1 min-w-0 rounded-lg border border-slate-200 px-3 py-2 text-[13px] focus:outline-none focus:ring-2"
-                  style={{ color: INK }}
-                />
-                <button
-                  onClick={submitEmail}
-                  disabled={!emailInput.trim()}
-                  className="text-sm font-medium px-4 py-2 rounded-lg border disabled:opacity-40 shrink-0"
-                  style={{ color: COBALT, borderColor: "#BFDBFE", background: "white" }}
-                >
-                  Keep me posted
-                </button>
-              </div>
-            </>
-          )}
-        </div>
       </div>
       )}
 
