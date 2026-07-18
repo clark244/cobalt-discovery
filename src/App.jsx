@@ -474,7 +474,7 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
     }
     gap(8);
     // Capacity
-    text(`Measurement capacity: ${mat.capacity ?? "-"} / 5`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
+    text(`Measurement capacity: ${mat.capacity != null ? Math.round(mat.capacity) : "-"} / 5`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
     gap(2);
     text(mat.capacityNote || "", margin, { size: 9, color: GRAY_RGB });
     if (mat.capacityComponents) {
@@ -714,11 +714,11 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
           <div className="flex items-center justify-between">
             <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: INK }}>Measurement capacity</div>
             <div className="text-xs font-bold" style={{ color: COBALT }}>
-              {d.maturity?.capacity ?? "–"}<span style={{ color: "#9CA3AF" }}> / 5</span>
+              {d.maturity?.capacity != null ? Math.round(d.maturity.capacity) : "–"}<span style={{ color: "#9CA3AF" }}> / 5</span>
               <InfoTip text={d.maturity?.capacityNext} />
             </div>
           </div>
-          <MaturityBar value={d.maturity?.capacity} />
+          <MaturityBar value={d.maturity?.capacity != null ? Math.round(d.maturity.capacity) : null} />
           <p className="text-xs mt-2" style={{ color: "#4B5563" }}>{d.maturity?.capacityNote}</p>
           {d.maturity?.capacityComponents && (
             <div className="mt-2 space-y-0.5">
