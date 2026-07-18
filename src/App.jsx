@@ -1184,14 +1184,19 @@ export default function App() {
                 style={m.role === "user" ? { background: COBALT, color: "white", borderBottomRightRadius: 4 } : { background: "#F3F4F6", color: INK, borderBottomLeftRadius: 4 }}>
                 {m.content}
                 {m.role !== "user" && TTS_OK && (
-                  <div className="mt-1.5">
+                  <div className="flex justify-end mt-1">
                     <button
                       onClick={() => speakMessage(i, m.content)}
-                      className="inline-flex items-center gap-1 text-[11px] font-medium"
-                      style={{ color: COBALT }}
+                      className="hover:opacity-70 transition-opacity"
+                      style={{ color: speakingIdx === i ? COBALT : "#9CA3AF", lineHeight: 0 }}
+                      title={speakingIdx === i ? "Stop reading" : "Read aloud"}
                       aria-label={speakingIdx === i ? "Stop reading this response" : "Read this response aloud"}
                     >
-                      {speakingIdx === i ? "⏹ Stop" : "🔊 Read aloud"}
+                      {speakingIdx === i ? (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5" /></svg>
+                      ) : (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></svg>
+                      )}
                     </button>
                   </div>
                 )}
