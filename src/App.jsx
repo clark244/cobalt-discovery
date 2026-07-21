@@ -35,12 +35,16 @@ const DEV_TRANSCRIPT = [
 ];
 
 async function callClaude(promptId, messages) {
+  // The API only accepts { role, content } per message. Our UI attaches extra
+  // fields (e.g. `options` for quick-pick chips), so strip everything else
+  // before sending — otherwise the API rejects the unexpected key.
+  const clean = (messages || []).map(({ role, content }) => ({ role, content }));
   for (let attempt = 0; attempt <= 1; attempt++) {
     try {
       const res = await fetch("/.netlify/functions/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ promptId, messages }),
+        body: JSON.stringify({ promptId, messages: clean }),
       });
       if (res.status === 429) {
         const info = await res.json().catch(() => ({}));
