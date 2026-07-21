@@ -54,12 +54,16 @@ const DEV_TRANSCRIPT = [
 ];
 
 async function callClaude(promptId, messages) {
+  // The API only accepts { role, content } per message. Our UI attaches extra
+  // fields (e.g. `options` for quick-pick chips), so strip everything else
+  // before sending — otherwise the API rejects the unexpected key.
+  const clean = (messages || []).map(({ role, content }) => ({ role, content }));
   for (let attempt = 0; attempt <= 1; attempt++) {
     try {
       const res = await fetch("/.netlify/functions/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ promptId, messages }),
+        body: JSON.stringify({ promptId, messages: clean }),
       });
       if (res.status === 429) {
         const info = await res.json().catch(() => ({}));
@@ -116,19 +120,62 @@ function Connector({ data }) {
   );
 }
 
-function MaturityBar({ value, max = 5 }) {
-  const v = Number(value) || 0;
+// Qualitative bands replaced the old 1-5 scores: a numeric x/5 felt arbitrary
+// after a short conversation. Three ordered bands, low → high.
+const BAND_ORDER = ["Not yet in place", "Emerging", "Established"];
+function bandColor(band) {
+  if (band === "Established") return COBALT;
+  if (band === "Emerging") return AMBER;
+  return "#9CA3AF"; // "Not yet in place" / unknown
+}
+function BandChip({ band }) {
+  const c = bandColor(band);
   return (
-    <div className="flex gap-1 mt-1">
-      {Array.from({ length: max }, (_, i) => i + 1).map((n) => {
-        // Fractional fill: a segment can be fully, partially, or not filled.
-        const fill = Math.max(0, Math.min(1, v - (n - 1)));
+    <span
+      className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border shrink-0"
+      style={{ color: c, borderColor: c + "55", background: c + "12" }}
+    >
+      {band || "—"}
+    </span>
+  );
+}
+// A dimension's position on the three-band ladder, current band highlighted.
+function BandLadder({ bands, current }) {
+  return (
+    <ol className="mt-1.5 space-y-1">
+      {bands.map(([band, desc]) => {
+        const isCurrent = band === current;
+        const c = bandColor(band);
         return (
-          <div key={n} className="h-1.5 flex-1 rounded-full overflow-hidden" style={{ background: "#E5E7EB" }}>
-            <div className="h-full rounded-full" style={{ width: `${fill * 100}%`, background: COBALT }} />
-          </div>
+          <li
+            key={band}
+            className="text-[11px] leading-snug flex gap-1.5 rounded px-1.5 py-1"
+            style={{ background: isCurrent ? c + "12" : "transparent" }}
+          >
+            <span className="font-bold shrink-0" style={{ color: isCurrent ? c : "#9CA3AF" }}>{band}</span>
+            <span style={{ color: isCurrent ? INK : "#6B7280", fontWeight: isCurrent ? 600 : 400 }}>— {desc}</span>
+          </li>
         );
       })}
+    </ol>
+  );
+}
+// Strength / Opportunity pair shown under a dimension (replaces the numeric note + next-level tooltip).
+function StrengthOpp({ strength, opportunity }) {
+  return (
+    <div className="mt-2 space-y-1">
+      {strength && (
+        <p className="text-xs leading-snug">
+          <span className="font-semibold" style={{ color: "#15803D" }}>Strength: </span>
+          <span style={{ color: "#4B5563" }}>{strength}</span>
+        </p>
+      )}
+      {opportunity && (
+        <p className="text-xs leading-snug">
+          <span className="font-semibold" style={{ color: COBALT }}>Opportunity: </span>
+          <span style={{ color: "#4B5563" }}>{opportunity}</span>
+        </p>
+      )}
     </div>
   );
 }
@@ -241,68 +288,39 @@ function PhaseTracker({ phase }) {
   );
 }
 
-// Static rubrics shown when a user expands "How is this scored?". These are Cobalt's
-// fixed 1-5 scales (not model-generated), so they're free to render and always consistent.
-const CLARITY_LEVELS = [
-  "Unclear — no clearly identified outcome or mechanism.",
-  "Outcome only — names an intended outcome, but no user behavior or mechanism.",
-  "Behavior named, mechanism vague — names the key behavior, but the link to the outcome is asserted, not reasoned.",
-  "Coherent chain, untested — can articulate both mechanisms and the active ingredient, but it's untested.",
-  "Defined and operationalized — constructs are measurable, and they can name what would confirm or disconfirm the theory.",
+// Static band ladders shown when a user expands "What the bands mean". These are Cobalt's
+// fixed three-band scales (not model-generated), so they're free to render and always consistent.
+const CLARITY_BANDS = [
+  ["Not yet in place", "No clearly identified outcome or mechanism yet."],
+  ["Emerging", "Behavior and outcome are named, but the link between them is asserted, not yet reasoned and evidenced."],
+  ["Established", "Both mechanisms are articulated and the behavior→outcome link is reasoned and evidenced; at its strongest, you can say what would confirm or disconfirm the theory."],
 ];
-const CAPACITY_LEVELS = {
+const CAPACITY_BANDS = {
   "Analytic skill": {
     key: "analyticSkill",
-    levels: [
-      "None.",
-      "A smart engineer, but impact measurement isn't their core skill; no clear owner yet.",
-      "Enough data-science skill to run analyses, with a clear owner, but lacking research-design depth.",
-      "Enough in-house research skill to fully run a measurement plan, with a clear owner.",
-      "Exceptional R&D skill, unusual for the company's stage.",
+    bands: [
+      ["Not yet in place", "No owner for measurement, or the skills present are unrelated."],
+      ["Emerging", "Adjacent data skill exists, but not core research-design expertise or a clear owner."],
+      ["Established", "In-house research skill to fully run a measurement plan, with a clear owner."],
     ],
   },
   "Data infrastructure": {
     key: "dataInfrastructure",
-    levels: [
-      "None, or too messy to use.",
-      "Available but not yet organized.",
-      "Organized and usable with minimal extra work.",
-      "Collected and organized for routine measurement analyses.",
-      "Rich, well-organized, and transparently useful for internal and external decisions.",
+    bands: [
+      ["Not yet in place", "None, or too messy to use."],
+      ["Emerging", "Data exists but isn't yet organized for analysis."],
+      ["Established", "Organized and usable for routine measurement."],
     ],
   },
   "Budget": {
     key: "budget",
-    levels: [
-      "None.",
-      "Requesting an external, time-limited grant.",
-      "Secured an external, time-limited grant.",
-      "Internal budget is plausible with an owner identified, but not yet committed.",
-      "Committed internal budget and staffing for ongoing measurement, with an owner.",
+    bands: [
+      ["Not yet in place", "No budget, or only the intent to seek an external grant."],
+      ["Emerging", "Seeking or holding an external, time-limited grant, with no internal commitment yet."],
+      ["Established", "Internal budget and staffing for ongoing measurement, with an owner."],
     ],
   },
 };
-
-function RubricScale({ levels, current }) {
-  return (
-    <ol className="mt-1.5 space-y-1">
-      {levels.map((desc, idx) => {
-        const lvl = idx + 1;
-        const isCurrent = lvl === current;
-        return (
-          <li
-            key={lvl}
-            className="text-[11px] leading-snug flex gap-1.5 rounded px-1.5 py-1"
-            style={{ background: isCurrent ? "#EFF4FF" : "transparent" }}
-          >
-            <span className="font-bold shrink-0" style={{ color: isCurrent ? COBALT : "#9CA3AF" }}>{lvl}</span>
-            <span style={{ color: isCurrent ? INK : "#6B7280", fontWeight: isCurrent ? 600 : 400 }}>{desc}</span>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
 
 function Deliverable({ d, onEmailSubmit, messages = [] }) {
   const [copied, setCopied] = useState(false);
@@ -464,46 +482,35 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
     });
     gap(8);
 
-    // Maturity
-    const mat = d.maturity || {};
-    text("Maturity", margin, { size: 11, color: INK_RGB, style: "bold" });
+    // Assessment (qualitative bands + strengths/opportunities; no numeric scores)
+    const asmt = d.assessment || {};
+    const clr = asmt.clarity || {};
+    const cap = asmt.capacity || {};
+    text("Assessment", margin, { size: 11, color: INK_RGB, style: "bold" });
     gap(6);
     // Clarity
-    text(`Causal model clarity: ${mat.clarity ?? "-"} / 5`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
-    gap(2);
-    text(mat.clarityNote || "", margin, { size: 9, color: GRAY_RGB });
-    if (mat.clarityNext) {
-      gap(1);
-      text(`To reach the next level: ${mat.clarityNext}`, margin, { size: 8.5, color: COBALT_RGB, style: "italic" });
-    }
+    text(`Causal model clarity — ${clr.band || "—"}`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
+    if (clr.strength) { gap(2); text(`Strength: ${clr.strength}`, margin, { size: 9, color: GREEN_RGB }); }
+    if (clr.opportunity) { gap(1); text(`Opportunity: ${clr.opportunity}`, margin, { size: 9, color: COBALT_RGB, style: "italic" }); }
     gap(8);
-    // Capacity
-    text(`Measurement capacity: ${mat.capacity != null ? Math.round(mat.capacity) : "-"} / 5`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
-    gap(2);
-    text(mat.capacityNote || "", margin, { size: 9, color: GRAY_RGB });
-    if (mat.capacityComponents) {
-      const cc = mat.capacityComponents;
-      const lim = (mat.capacityLimiter || "").toLowerCase();
-      const rows = [
-        ["Analytic skill", cc.analyticSkill, "analytic skill"],
-        ["Data infrastructure", cc.dataInfrastructure, "data infrastructure"],
-        ["Budget", cc.budget, "budget"],
-      ];
-      gap(2);
-      rows.forEach(([label, val, key]) => {
-        const isLim = lim === key;
-        gap(1);
-        text(`   ${label}: ${val ?? "-"} / 5${isLim ? "  (limiting)" : ""}`, margin, {
-          size: 8.5,
-          color: isLim ? AMBER_RGB : GRAY_RGB,
-          style: isLim ? "bold" : "normal",
-        });
+    // Capacity — three components read independently
+    text("Measurement capacity", margin, { size: 9.5, color: INK_RGB, style: "bold" });
+    const focus = (cap.focusArea || "").toLowerCase();
+    const capRows = [
+      ["Analytic skill", cap.analyticSkill, "analytic skill"],
+      ["Data infrastructure", cap.dataInfrastructure, "data infrastructure"],
+      ["Budget", cap.budget, "budget"],
+    ];
+    capRows.forEach(([label, comp, key]) => {
+      const c = comp || {};
+      const isFocus = focus === key;
+      gap(3);
+      text(`${label} — ${c.band || "—"}${isFocus ? "  (where to focus)" : ""}`, margin + 8, {
+        size: 9, color: isFocus ? AMBER_RGB : INK_RGB, style: "bold", maxW: contentW - 8,
       });
-    }
-    if (mat.capacityNext) {
-      gap(1);
-      text(`To reach the next level: ${mat.capacityNext}`, margin, { size: 8.5, color: COBALT_RGB, style: "italic" });
-    }
+      if (c.strength) { gap(1); text(`Strength: ${c.strength}`, margin + 8, { size: 8.5, color: GRAY_RGB, maxW: contentW - 8 }); }
+      if (c.opportunity) { gap(1); text(`Opportunity: ${c.opportunity}`, margin + 8, { size: 8.5, color: COBALT_RGB, style: "italic", maxW: contentW - 8 }); }
+    });
     gap(14);
 
     // Evidence-demand fit
@@ -634,6 +641,9 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
   };
 
   const m = d.model || {};
+  const assessment = d.assessment || {};
+  const clarity = assessment.clarity || {};
+  const capacity = assessment.capacity || {};
   return (
     <div className="space-y-6">
       {d.causalStudy?.isTopPriority && (
@@ -700,61 +710,47 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="rounded-xl border border-slate-200 p-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: INK }}>Causal model clarity</div>
-            <div className="text-xs font-bold" style={{ color: COBALT }}>
-              {d.maturity?.clarity ?? "–"}<span style={{ color: "#9CA3AF" }}> / 5</span>
-              <InfoTip text={d.maturity?.clarityNext} />
-            </div>
+            <BandChip band={clarity.band} />
           </div>
-          <MaturityBar value={d.maturity?.clarity} />
-          <p className="text-xs mt-2" style={{ color: "#4B5563" }}>{d.maturity?.clarityNote}</p>
+          <StrengthOpp strength={clarity.strength} opportunity={clarity.opportunity} />
           <button onClick={() => toggleRubric("clarity")} className="mt-2 text-[11px] font-semibold" style={{ color: COBALT }}>
-            {rubric.clarity ? "Hide scale ▴" : "How is this scored? ▾"}
+            {rubric.clarity ? "Hide bands ▴" : "What the bands mean ▾"}
           </button>
-          {rubric.clarity && <RubricScale levels={CLARITY_LEVELS} current={d.maturity?.clarity} />}
+          {rubric.clarity && <BandLadder bands={CLARITY_BANDS} current={clarity.band} />}
         </div>
         <div className="rounded-xl border border-slate-200 p-3">
-          <div className="flex items-center justify-between">
-            <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: INK }}>Measurement capacity</div>
-            <div className="text-xs font-bold" style={{ color: COBALT }}>
-              {d.maturity?.capacity != null ? Math.round(d.maturity.capacity) : "–"}<span style={{ color: "#9CA3AF" }}> / 5</span>
-              <InfoTip text={d.maturity?.capacityNext} />
-            </div>
-          </div>
-          <MaturityBar value={d.maturity?.capacity != null ? Math.round(d.maturity.capacity) : null} />
-          <p className="text-xs mt-2" style={{ color: "#4B5563" }}>{d.maturity?.capacityNote}</p>
-          {d.maturity?.capacityComponents && (
-            <div className="mt-2 space-y-0.5">
-              {[
-                ["Analytic skill", d.maturity.capacityComponents.analyticSkill, "analytic skill"],
-                ["Data infrastructure", d.maturity.capacityComponents.dataInfrastructure, "data infrastructure"],
-                ["Budget", d.maturity.capacityComponents.budget, "budget"],
-              ].map(([label, val, key]) => {
-                const isLimiter = (d.maturity?.capacityLimiter || "").toLowerCase() === key;
-                return (
-                  <div key={key} className="flex items-center justify-between text-[11px]">
-                    <span style={{ color: isLimiter ? AMBER : "#6B7280", fontWeight: isLimiter ? 600 : 400 }}>
-                      {label}{isLimiter ? " · limiting" : ""}
+          <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: INK }}>Measurement capacity</div>
+          <div className="space-y-2.5">
+            {Object.entries(CAPACITY_BANDS).map(([name, { key }]) => {
+              const comp = capacity[key] || {};
+              const isFocus = (assessment.capacity?.focusArea || "").toLowerCase() === name.toLowerCase();
+              return (
+                <div key={key}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold" style={{ color: isFocus ? AMBER : INK }}>
+                      {name}{isFocus ? " · where to focus" : ""}
                     </span>
-                    <span style={{ color: isLimiter ? AMBER : "#6B7280", fontWeight: isLimiter ? 600 : 400 }}>{val ?? "–"}/5</span>
+                    <BandChip band={comp.band} />
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  <StrengthOpp strength={comp.strength} opportunity={comp.opportunity} />
+                </div>
+              );
+            })}
+          </div>
           <button onClick={() => toggleRubric("capacity")} className="mt-2 text-[11px] font-semibold" style={{ color: COBALT }}>
-            {rubric.capacity ? "Hide scale ▴" : "How is this scored? ▾"}
+            {rubric.capacity ? "Hide bands ▴" : "What the bands mean ▾"}
           </button>
           {rubric.capacity && (
             <div className="mt-1.5 space-y-2">
-              <p className="text-[11px]" style={{ color: "#9CA3AF" }}>Capacity is the average of these three components:</p>
-              {Object.entries(CAPACITY_LEVELS).map(([name, { key, levels }]) => {
-                const cur = d.maturity?.capacityComponents?.[key];
+              <p className="text-[11px]" style={{ color: "#9CA3AF" }}>Each component is read on its own — there's no single capacity number.</p>
+              {Object.entries(CAPACITY_BANDS).map(([name, { key, bands }]) => {
+                const cur = capacity[key]?.band;
                 return (
                   <div key={key}>
-                    <div className="text-[11px] font-semibold" style={{ color: INK }}>{name}{cur != null ? ` · ${cur}/5` : ""}</div>
-                    <RubricScale levels={levels} current={cur} />
+                    <div className="text-[11px] font-semibold" style={{ color: INK }}>{name}</div>
+                    <BandLadder bands={bands} current={cur} />
                   </div>
                 );
               })}
@@ -976,8 +972,11 @@ export default function App() {
     }
   }, [messages, loading, deliverable, generating]);
 
-  const send = async () => {
-    const text = input.trim();
+  // Core send. Accepts the text directly so quick-pick option buttons and the
+  // free-text box share one path. Passing a string (from an option chip) is
+  // treated the same as a typed answer.
+  const submit = async (raw) => {
+    const text = (raw ?? input).trim();
     if (!text || loading) return;
     setError("");
     const next = [...messages, { role: "user", content: text }];
@@ -1002,7 +1001,16 @@ export default function App() {
         setOutOfScope(true);
         saveSignal("out_of_scope"); // count the bounce (no transcript logged)
       }
-      setMessages([...next, { role: "assistant", content: reply }]);
+      // Quick-pick options: the guide may append a final line "[[OPTIONS]] a | b | c".
+      // Pull them off the visible text and attach them to the message so we can
+      // render clickable chips. Free-text answering always remains available.
+      let options = [];
+      const optMatch = reply.match(/\[\[OPTIONS\]\]([^\n]*)/);
+      if (optMatch) {
+        options = optMatch[1].split("|").map((s) => s.trim()).filter(Boolean).slice(0, 4);
+        reply = reply.replace(/\[\[OPTIONS\]\][^\n]*/g, "").trim();
+      }
+      setMessages([...next, { role: "assistant", content: reply, options }]);
     } catch (e) {
       setError(e.code === 429 ? (e.message || "You've reached today's limit — please come back tomorrow.") : "Something hiccuped. Try sending that again.");
       setMessages(messages);
@@ -1010,6 +1018,7 @@ export default function App() {
       setLoading(false);
     }
   };
+  const send = () => submit();
 
   // Silently persist the full session to the Google Sheet (fire-and-forget).
   const saveSession = async (model) => {
@@ -1079,7 +1088,7 @@ export default function App() {
       // Call 2: opportunities, grounded in the model + capacity scores from call 1 (keeps examples calibrated).
       const oppsRaw = await callClaude(
         "opps",
-        [{ role: "user", content: `Discovery conversation:\n\n${transcript}\n\nDerived causal model and maturity scores:\n\n${JSON.stringify({ model: modelPart.model, maturity: modelPart.maturity })}\n\nProduce the opportunities JSON.` }],
+        [{ role: "user", content: `Discovery conversation:\n\n${transcript}\n\nDerived causal model and qualitative assessment:\n\n${JSON.stringify({ model: modelPart.model, assessment: modelPart.assessment })}\n\nProduce the opportunities JSON.` }],
       );
       const oppsPart = parseJson(oppsRaw, "opportunities");
       const parsed = { ...modelPart, ...oppsPart };
@@ -1212,6 +1221,28 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {/* Quick-pick option chips for the latest guide question. Optional shortcuts —
+              the free-text box below always stays available for a fuller answer. */}
+          {(() => {
+            const last = messages[messages.length - 1];
+            const opts = !deliverable && !loading && !outOfScope && last && last.role === "assistant" && Array.isArray(last.options) ? last.options : [];
+            if (opts.length === 0) return null;
+            return (
+              <div className="flex flex-wrap gap-2 pr-10">
+                {opts.map((opt, i) => (
+                  <button
+                    key={i}
+                    onClick={() => submit(opt)}
+                    className="text-[13px] px-3 py-1.5 rounded-full border transition-colors hover:bg-blue-50"
+                    style={{ color: COBALT, borderColor: "#BFDBFE", background: "white" }}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
 
           {ready && !deliverable && !generating && (
             <div className="flex justify-center pt-1">
