@@ -1226,9 +1226,6 @@ export default function App() {
 
               </ul>
             </div>
-            <p className="mt-3 text-[12px] max-w-md" style={{ color: "#6B7280" }}>
-              This is a thinking tool, not a grant application — it's useful on its own. If it's a fit, you can choose to talk with Cobalt at the end.
-            </p>
             {gateStep === "form" ? (
               <div className="mt-4 w-full max-w-xs flex flex-col items-stretch gap-2.5">
                 <p className="text-[11px]" style={{ color: "#9CA3AF" }}>Enter your details to begin — we'll email a 6-digit code to verify your address.</p>
