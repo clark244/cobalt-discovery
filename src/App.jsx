@@ -1214,7 +1214,7 @@ export default function App() {
             <CobaltLogo size={48} />
             <h2 className="mt-4 text-xl font-bold leading-tight max-w-md" style={{ color: INK }}>Want to measure your solution's impact but not sure where to start?</h2>
             <p className="mt-3 text-sm max-w-md" style={{ color: "#4B5563" }}>
-              A free, 10-minute guided conversation for early-stage education, health, and workforce teams. Talk through how your solution works, and walk away with a plan you can keep — no funding application, no obligation.
+              A free, 10-minute guided conversation for early-stage education, health, and workforce teams. Talk through how your solution works, and walk away with a plan you can keep and no obligations.
             </p>
             <div className="mt-4 w-full max-w-sm text-left rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
               <div className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: COBALT }}>What you'll walk away with</div>
