@@ -1210,7 +1210,7 @@ export default function App() {
         {started && <PhaseTracker phase={phase} />}
 
         {!started ? (
-          <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center px-8 py-6 text-center">
+          <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start px-8 py-8 text-center">
             <CobaltLogo size={48} />
             <h2 className="mt-4 text-xl font-bold leading-tight max-w-md" style={{ color: INK }}>See how your product creates impact — and where to prove it</h2>
             <p className="mt-3 text-sm max-w-md" style={{ color: "#4B5563" }}>
