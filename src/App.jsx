@@ -1153,12 +1153,21 @@ export default function App() {
         {started && <PhaseTracker phase={phase} />}
 
         {!started ? (
-          <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
+          <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start px-8 py-8 text-center">
             <CobaltLogo size={48} />
-            <h2 className="mt-4 text-lg font-bold" style={{ color: INK }}>Cobalt Impact Discovery</h2>
+            <h2 className="mt-4 text-xl font-bold leading-tight max-w-md" style={{ color: INK }}>Want to measure your solution's impact but not sure where to start?</h2>
             <p className="mt-3 text-sm max-w-md" style={{ color: "#4B5563" }}>
-              Cobalt Collective helps early-stage education, health, and workforce teams build impact measurement into how they work. In a short conversation (about 5–10 minutes), we'll map how your solution creates impact — and where measuring it could help most.
+              Complete a free, 10-minute guided conversation designed for early-stage education, health, and workforce teams. Talk through how your solution works, and walk away with a plan you can keep, with no obligations.
             </p>
+            <div className="mt-4 w-full max-w-sm text-left rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: COBALT }}>What you'll walk away with</div>
+              <ul className="space-y-1.5 text-[12px] leading-snug" style={{ color: "#4B5563" }}>
+                <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>A draft impact model</span> — how your solution is designed to make good things happen.</li>
+                <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>A prioritized measurement plan</span> — concrete steps to measure your impact and how each can help.</li>
+                <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>A shareable summary</span> — a brief report to keep or send to your team, a funder, or a buyer.</li>
+                <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>The option to go deeper</span> — an invitation to speak with the Cobalt team to discuss how we can help.</li>
+              </ul>
+            </div>
             <input
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
