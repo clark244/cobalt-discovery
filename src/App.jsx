@@ -53,6 +53,11 @@ const DEV_TRANSCRIPT = [
   { role: "assistant", content: "Strong position — people, data, partners, and some committed budget, with funding scale as the binding constraint. Here's my read: your platform builds constructive-disagreement skill through practice plus real-time AI coaching; educators and funders are the evidence audience; and the transfer from platform to real-world conversation is the hardest link to demonstrate. Does that land?" },
 ];
 
+// Set once the email gate is passed (see verify-code). Sent as a Bearer token
+// on every function call so the server — not the UI — enforces the gate.
+let AUTH_TOKEN = "";
+const authHeaders = () => (AUTH_TOKEN ? { Authorization: `Bearer ${AUTH_TOKEN}` } : {});
+
 async function callClaude(promptId, messages) {
   // The API only accepts { role, content } per message. Our UI attaches extra
   // fields (e.g. `options` for quick-pick chips), so strip everything else
@@ -62,7 +67,7 @@ async function callClaude(promptId, messages) {
     try {
       const res = await fetch("/.netlify/functions/claude", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ promptId, messages: clean }),
       });
       if (res.status === 429) {
@@ -946,6 +951,13 @@ export default function App() {
   const [reviewer, setReviewer] = useState("");      // reviewer name/initials
   const [started, setStarted] = useState(false);     // false until name entered
   const [nameInput, setNameInput] = useState("");
+  const [emailInput, setEmailInput] = useState("");   // email gate
+  const [tosAccepted, setTosAccepted] = useState(false);
+  const [gateStep, setGateStep] = useState("form");   // "form" -> "code"
+  const [codeInput, setCodeInput] = useState("");
+  const [gateBusy, setGateBusy] = useState(false);
+  const [gateError, setGateError] = useState("");
+  const [devCode, setDevCode] = useState("");         // shown only in local dev (no mail provider)
   const [phase, setPhase] = useState(0); // 0 getting started, 1 how it works, 2 making it happen, 3 your results
   const [sessionId] = useState(() => "s_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
   // Capture where the visitor came from, once, on load — passive, no user action.
@@ -1025,7 +1037,7 @@ export default function App() {
     try {
       await fetch("/.netlify/functions/save-session", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
           sessionId,
           reviewer,
@@ -1046,7 +1058,7 @@ export default function App() {
     try {
       await fetch("/.netlify/functions/save-session", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
           type: "signal",
           kind,
@@ -1063,6 +1075,51 @@ export default function App() {
     }
   };
   const saveEmail = (email) => saveSignal("email", { email });
+
+  // --- Email gate: request a 6-digit code, then verify it for a token. ---
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const gateReady = EMAIL_RE.test(emailInput.trim()) && nameInput.trim() && tosAccepted;
+
+  const requestCode = async () => {
+    if (!gateReady || gateBusy) return;
+    setGateBusy(true); setGateError("");
+    try {
+      const res = await fetch("/.netlify/functions/request-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailInput.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Couldn't send the code.");
+      if (data.devCode) setDevCode(data.devCode);
+      setGateStep("code");
+    } catch (e) {
+      setGateError(e.message || "Couldn't send the code. Try again.");
+    } finally {
+      setGateBusy(false);
+    }
+  };
+
+  const submitCode = async () => {
+    if (!/^\d{6}$/.test(codeInput.trim()) || gateBusy) return;
+    setGateBusy(true); setGateError("");
+    try {
+      const res = await fetch("/.netlify/functions/verify-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailInput.trim(), code: codeInput.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Verification failed.");
+      AUTH_TOKEN = data.token;              // gate passed — token now sent on every call
+      setReviewer(nameInput.trim());
+      setStarted(true);
+    } catch (e) {
+      setGateError(e.message || "Verification failed. Try again.");
+    } finally {
+      setGateBusy(false);
+    }
+  };
 
   const generate = async () => {
     setGenerating(true);
@@ -1166,24 +1223,79 @@ export default function App() {
                 <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>A prioritized measurement plan</span> — concrete steps to measure your impact and how each can help.</li>
                 <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>A shareable summary</span> — a brief report to keep or send to your team, a funder, or a buyer.</li>
                 <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>The option to go deeper</span> — an invitation to speak with the Cobalt team to discuss how we can help.</li>
+
               </ul>
             </div>
-            <input
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && nameInput.trim()) { setReviewer(nameInput.trim()); setStarted(true); } }}
-              placeholder="Your name or initials"
-              className="mt-4 w-full max-w-xs rounded-xl border border-slate-200 px-3 py-2.5 text-[14px] text-center focus:outline-none focus:ring-2"
-              style={{ color: INK }}
-            />
-            <button
-              onClick={() => { if (nameInput.trim()) { setReviewer(nameInput.trim()); setStarted(true); } }}
-              disabled={!nameInput.trim()}
-              className="mt-3 px-6 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-40"
-              style={{ background: COBALT }}
-            >
-              Start →
-            </button>
+            {gateStep === "form" ? (
+              <div className="mt-4 w-full max-w-xs flex flex-col items-stretch gap-2.5">
+                <p className="text-[11px]" style={{ color: "#9CA3AF" }}>Enter your details to begin — we'll email a 6-digit code to verify your address.</p>
+                <input
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  placeholder="Your name or initials"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[14px] text-center focus:outline-none focus:ring-2"
+                  style={{ color: INK }}
+                />
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") requestCode(); }}
+                  placeholder="you@organization.org"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[14px] text-center focus:outline-none focus:ring-2"
+                  style={{ color: INK }}
+                />
+                <label className="flex items-start gap-2 text-left text-[11px] leading-snug px-1" style={{ color: "#6B7280" }}>
+                  <input type="checkbox" checked={tosAccepted} onChange={(e) => setTosAccepted(e.target.checked)} className="mt-0.5" />
+                  <span>
+                    I agree to the <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: COBALT }}>Terms of Service</a> and <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: COBALT }}>Privacy Policy</a>, and confirm I am a human and not using automated tools.
+                  </span>
+                </label>
+                <button
+                  onClick={requestCode}
+                  disabled={!gateReady || gateBusy}
+                  className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-40"
+                  style={{ background: COBALT }}
+                >
+                  {gateBusy ? "Sending…" : "Email me a code →"}
+                </button>
+              </div>
+            ) : (
+              <div className="mt-4 w-full max-w-xs flex flex-col items-stretch gap-2.5">
+                <p className="text-[12px]" style={{ color: "#6B7280" }}>
+                  We emailed a 6-digit code to <span style={{ color: INK, fontWeight: 600 }}>{emailInput.trim()}</span>.
+                </p>
+                <input
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={codeInput}
+                  onChange={(e) => setCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  onKeyDown={(e) => { if (e.key === "Enter") submitCode(); }}
+                  placeholder="------"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-center text-[18px] tracking-[0.4em] focus:outline-none focus:ring-2"
+                  style={{ color: INK }}
+                />
+                {devCode && (
+                  <p className="text-[11px]" style={{ color: "#9CA3AF" }}>dev: code is {devCode}</p>
+                )}
+                <button
+                  onClick={submitCode}
+                  disabled={!/^\d{6}$/.test(codeInput) || gateBusy}
+                  className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-40"
+                  style={{ background: COBALT }}
+                >
+                  {gateBusy ? "Verifying…" : "Verify & start →"}
+                </button>
+                <button
+                  onClick={() => { setGateStep("form"); setCodeInput(""); setDevCode(""); setGateError(""); }}
+                  className="text-[11px] underline"
+                  style={{ color: "#9CA3AF" }}
+                >
+                  ← Use a different email / resend
+                </button>
+              </div>
+            )}
+            {gateError && <p className="mt-3 text-[12px]" style={{ color: AMBER }}>{gateError}</p>}
             {devMode && (
               <button
                 onClick={loadDevConversation}
