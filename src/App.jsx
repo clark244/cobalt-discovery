@@ -18,6 +18,20 @@ const impactChipStyle = (level) => {
       return { color: "#3B82F6", backgroundColor: "#F4F8FE", borderColor: "#BFDBFE" };
   }
 };
+// What has to exist before an opportunity can start. Green = start today;
+// amber = field an instrument; grey = a product change has to ship first.
+const feasibilityChipStyle = (f) => {
+  switch (String(f || "").toLowerCase()) {
+    case "no build required":
+      return { color: "#15803D", backgroundColor: "#F0FDF4", borderColor: "#86EFAC" };
+    case "requires engineering":
+      return { color: "#92400E", backgroundColor: "#FFFBEB", borderColor: "#FCD34D" };
+    case "requires new collection":
+    default:
+      return { color: "#6B7280", backgroundColor: "#F9FAFB", borderColor: "#D1D5DB" };
+  }
+};
+
 // Where "Email Cobalt" outreach is sent. Change this to a shared inbox if desired.
 const COBALT_EMAIL = "clark@cobaltcollective.org";
 // Booking link used only on the third-party causal-study priority card.
@@ -543,7 +557,10 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
     }
     (d.opportunities || []).forEach((o, i) => {
       ensureSpace(56);
-      const badge = `[${(o.impact || o.lift || "")} impact]`;
+      const badge = [
+        o.feasibility ? `[${o.feasibility}]` : "",
+        `[${(o.impact || o.lift || "")} impact]`,
+      ].filter(Boolean).join("   ");
       text(`${i + 1}. ${o.title}   ${badge}`, margin, { size: 10.5, color: INK_RGB, style: "bold" });
       gap(2);
       text(`"${o.question}"`, margin + 12, { size: 9.5, color: [55, 65, 81], style: "italic", maxW: contentW - 12 });
@@ -816,6 +833,10 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
                       <span className="font-semibold text-sm" style={{ color: INK }}>{i + 1}. {o.question}</span>
                     </div>
                     <div className="flex gap-1.5 shrink-0">
+                      {o.feasibility && (
+                        <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border"
+                          style={feasibilityChipStyle(o.feasibility)}>{o.feasibility}</span>
+                      )}
                       <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full border"
                         style={impactChipStyle(o.impact || o.lift)}>{o.impact || o.lift} impact</span>
                     </div>
@@ -1145,7 +1166,7 @@ export default function App() {
       // Call 2: opportunities, grounded in the model + capacity scores from call 1 (keeps examples calibrated).
       const oppsRaw = await callClaude(
         "opps",
-        [{ role: "user", content: `Discovery conversation:\n\n${transcript}\n\nDerived causal model and qualitative assessment:\n\n${JSON.stringify({ model: modelPart.model, assessment: modelPart.assessment })}\n\nProduce the opportunities JSON.` }],
+        [{ role: "user", content: `Discovery conversation:\n\n${transcript}\n\nDerived causal model and qualitative assessment:\n\n${JSON.stringify({ model: modelPart.model, assessment: modelPart.assessment, existingEvidence: modelPart.existingEvidence, dataFormNote: modelPart.dataFormNote })}\n\nProduce the opportunities JSON.` }],
       );
       const oppsPart = parseJson(oppsRaw, "opportunities");
       const parsed = { ...modelPart, ...oppsPart };
