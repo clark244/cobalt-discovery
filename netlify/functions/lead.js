@@ -31,8 +31,11 @@ async function airtable(path, init = {}) {
   return data;
 }
 
-async function findByEmail(email) {
-  const formula = `LOWER({Email})='${email.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+// Finds an existing SUBSCRIBER row for this email. Message rows don't count, so
+// someone who only sent a message can still subscribe.
+async function findSubscriber(email) {
+  const safe = email.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const formula = `AND(LOWER({Email})='${safe}', {Source}!='${SOURCE.message}')`;
   const data = await airtable(`?maxRecords=1&filterByFormula=${encodeURIComponent(formula)}`);
   return (data.records || [])[0] || null;
 }
@@ -89,8 +92,14 @@ export default async (req) => {
   if (!gate.ok) return json({ error: "Too many submissions today. Please try again tomorrow." }, 429);
 
   if (!AIRTABLE_TOKEN) {
-    console.log(`[lead] DEV — AIRTABLE_TOKEN not set; would save ${type}:`, lead);
-    return json({ ok: true, dev: true }, 200);
+    // Local `netlify dev` only: pretend success so the UI can be tested.
+    if (process.env.NETLIFY_DEV === "true") {
+      console.log(`[lead] DEV — AIRTABLE_TOKEN not set; would save ${type}:`, lead);
+      return json({ ok: true, dev: true }, 200);
+    }
+    // Anywhere else a missing token is a config error — fail loudly, never fake a "Thanks".
+    console.log("[lead] AIRTABLE_TOKEN is not set — submission NOT saved:", type, lead.email);
+    return json({ error: "Something went wrong saving your details. Please try again later." }, 500);
   }
 
   const fields = {
@@ -103,14 +112,20 @@ export default async (req) => {
 
   try {
     if (type === "subscribe") {
-      // Already on the list (e.g. from the teaser site)? Fill in their details, keep original Source.
-      const existing = await findByEmail(lead.email);
+      // Already subscribed (teaser site or here)? Don't add a duplicate row. Just fill
+      // in any details that row is missing — never overwrite what's there.
+      const existing = await findSubscriber(lead.email);
       if (existing) {
-        const { Source, ...details } = fields;
-        await airtable(`/${existing.id}`, { method: "PATCH", body: JSON.stringify({ fields: details, typecast: true }) });
+        const have = existing.fields || {};
+        const fill = {};
+        for (const k of ["First Name", "Last Name", "Organization"]) if (!have[k]) fill[k] = fields[k];
+        if (Object.keys(fill).length) {
+          await airtable(`/${existing.id}`, { method: "PATCH", body: JSON.stringify({ fields: fill }) });
+        }
         return json({ ok: true }, 200);
       }
     } else {
+      // Messages always create a new row, whatever came before.
       fields.Message = lead.message;
     }
     // typecast lets Airtable create the new Source option the first time it's used.
@@ -123,4 +138,5 @@ export default async (req) => {
   if (type === "message") await sendMessageAlert(lead);
   return json({ ok: true }, 200);
 };
+
 
