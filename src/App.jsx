@@ -907,6 +907,89 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
 // Shown when the guide determines an org is outside Cobalt's education/health/
 // workforce focus. A warm dead-end — no assessment, no CTA — plus a safety
 // valve that resumes the chat if the guide misjudged the fit.
+// ── Landing-page lead capture (subscribe / send a message) — no chat, no code. ──
+// Free-provider domains get a soft nudge toward a work email; they're still accepted.
+const FREE_EMAIL_DOMAINS = new Set([
+  "gmail.com", "googlemail.com", "yahoo.com", "ymail.com", "hotmail.com", "outlook.com", "live.com", "msn.com",
+  "aol.com", "icloud.com", "me.com", "mac.com", "proton.me", "protonmail.com", "gmx.com", "mail.com", "zoho.com",
+  "yandex.com", "comcast.net", "att.net", "verizon.net", "sbcglobal.net",
+]);
+const isFreeEmail = (email) => FREE_EMAIL_DOMAINS.has(String(email || "").trim().toLowerCase().split("@")[1] || "");
+
+function LeadForm({ type, onBack, onStartChat }) {
+  const [f, setF] = useState({ firstName: "", lastName: "", email: "", organization: "", message: "", website: "" });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState(false);
+  const set = (k) => (e) => setF((cur) => ({ ...cur, [k]: e.target.value }));
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim());
+  const ready = f.firstName.trim() && f.lastName.trim() && emailOk && f.organization.trim() && (type !== "message" || f.message.trim());
+  const isMsg = type === "message";
+
+  const submit = async () => {
+    if (!ready || busy) return;
+    setBusy(true); setErr("");
+    try {
+      const res = await fetch("/.netlify/functions/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, ...f }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Something went wrong. Please try again.");
+      setDone(true);
+    } catch (e) {
+      setErr(e.message || "Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (done) {
+    return (
+      <div className="mt-5 w-full max-w-xs flex flex-col items-center gap-2">
+        <div className="text-[15px] font-semibold" style={{ color: INK }}>
+          {isMsg ? `Thanks, ${f.firstName.trim()}. We'll get back to you soon.` : `Thanks, ${f.firstName.trim()}. You're on the list.`}
+        </div>
+        <button onClick={onStartChat} className="mt-1 text-[12px] underline" style={{ color: COBALT }}>
+          Want to map your impact in the meantime? Start the conversation →
+        </button>
+      </div>
+    );
+  }
+
+  const inputCls = "w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[14px] focus:outline-none focus:ring-2";
+  return (
+    <div className="mt-4 w-full max-w-xs flex flex-col items-stretch gap-2.5 text-left">
+      <p className="text-[12px] text-center" style={{ color: "#6B7280" }}>
+        {isMsg ? "Questions about Cobalt or how we work? Send us a note." : "Get occasional updates, tools, and resources from Cobalt. No chat required."}
+      </p>
+      <div className="flex gap-2">
+        <input value={f.firstName} onChange={set("firstName")} placeholder="First name" autoComplete="given-name" className={inputCls} style={{ color: INK }} />
+        <input value={f.lastName} onChange={set("lastName")} placeholder="Last name" autoComplete="family-name" className={inputCls} style={{ color: INK }} />
+      </div>
+      <input type="email" value={f.email} onChange={set("email")} placeholder="you@organization.org" autoComplete="email" className={inputCls} style={{ color: INK }} />
+      {emailOk && isFreeEmail(f.email) && (
+        <p className="text-[11px] -mt-1 px-1" style={{ color: AMBER }}>A work email helps us follow up, but this one works too.</p>
+      )}
+      <input value={f.organization} onChange={set("organization")} placeholder="Organization" autoComplete="organization" className={inputCls} style={{ color: INK }} />
+      {isMsg && (
+        <textarea value={f.message} onChange={set("message")} rows={4} placeholder="Your message…" className={inputCls + " resize-none"} style={{ color: INK }} />
+      )}
+      {/* Honeypot — hidden from people, tempting to bots. */}
+      <input value={f.website} onChange={set("website")} tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
+      <button onClick={submit} disabled={!ready || busy} className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-40" style={{ background: COBALT }}>
+        {busy ? "Sending…" : isMsg ? "Send message" : "Subscribe"}
+      </button>
+      {err && <p className="text-[12px] text-center" style={{ color: AMBER }}>{err}</p>}
+      <p className="text-[10.5px] text-center leading-snug" style={{ color: "#9CA3AF" }}>
+        See our <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="underline">Privacy Policy</a>.
+      </p>
+      <button onClick={onBack} className="text-[11px] underline" style={{ color: "#9CA3AF" }}>← Back</button>
+    </div>
+  );
+}
+
 function Offramp({ onResume }) {
   return (
     <div className="rounded-xl p-4" style={{ background: "#EFF4FF" }}>
@@ -975,6 +1058,10 @@ export default function App() {
   const [emailInput, setEmailInput] = useState("");   // email gate
   const [tosAccepted, setTosAccepted] = useState(false);
   const [gateStep, setGateStep] = useState("form");   // "form" -> "code"
+  // Direct link (e.g. discovery.cobaltcollective.org/?start) skips the two-card chooser
+  // and opens the sign-in step — for sharing the app on its own with reviewers/partners.
+  const [directStart] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("start"));
+  const [landingView, setLandingView] = useState(() => (directStart ? "gate" : "choose")); // "choose" | "gate" | "subscribe" | "message"
   const [codeInput, setCodeInput] = useState("");
   const [gateBusy, setGateBusy] = useState(false);
   const [gateError, setGateError] = useState("");
@@ -1196,6 +1283,7 @@ export default function App() {
     setInput("");
     setStarted(false);
     setNameInput("");
+    setLandingView(directStart ? "gate" : "choose");
     setPhase(0);
   };
 
@@ -1234,89 +1322,124 @@ export default function App() {
           <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start px-8 py-8 text-center">
             <CobaltLogo size={48} />
             <h2 className="mt-4 text-xl font-bold leading-tight max-w-md" style={{ color: INK }}>Want to measure your solution's impact but not sure where to start?</h2>
-            <p className="mt-3 text-sm max-w-md" style={{ color: "#4B5563" }}>
-              Complete a free, 10-minute guided conversation designed for early-stage education, health, and workforce teams. Talk through how your solution works, and walk away with a plan you can keep, with no obligations.
-            </p>
-            <div className="mt-4 w-full max-w-sm text-left rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: COBALT }}>What you'll walk away with</div>
-              <ul className="space-y-1.5 text-[12px] leading-snug" style={{ color: "#4B5563" }}>
-                <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>A draft impact model</span> — how your solution is designed to make good things happen.</li>
-                <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>A prioritized measurement plan</span> — concrete steps to measure your impact and how each can help.</li>
-                <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>A shareable summary</span> — a brief report to keep or send to your team, a funder, or a buyer.</li>
-                <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>The option to go deeper</span> — an invitation to speak with the Cobalt team to discuss how we can help.</li>
-
-              </ul>
-            </div>
-            {gateStep === "form" ? (
-              <div className="mt-4 w-full max-w-xs flex flex-col items-stretch gap-2.5">
-                <p className="text-[11px]" style={{ color: "#9CA3AF" }}>Enter your details to begin — we'll email a 6-digit code to verify your address.</p>
-                <input
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  placeholder="Your name or initials"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[14px] text-center focus:outline-none focus:ring-2"
-                  style={{ color: INK }}
-                />
-                <input
-                  type="email"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") requestCode(); }}
-                  placeholder="you@organization.org"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[14px] text-center focus:outline-none focus:ring-2"
-                  style={{ color: INK }}
-                />
-                <label className="flex items-start gap-2 text-left text-[11px] leading-snug px-1" style={{ color: "#6B7280" }}>
-                  <input type="checkbox" checked={tosAccepted} onChange={(e) => setTosAccepted(e.target.checked)} className="mt-0.5" />
-                  <span>
-                    I agree to the <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: COBALT }}>Terms of Service</a> and <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: COBALT }}>Privacy Policy</a>, and confirm I am a human and not using automated tools.
-                  </span>
-                </label>
-                <button
-                  onClick={requestCode}
-                  disabled={!gateReady || gateBusy}
-                  className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-40"
-                  style={{ background: COBALT }}
-                >
-                  {gateBusy ? "Sending…" : "Email me a code →"}
+            {landingView === "choose" && (
+              <>
+                <p className="mt-3 text-sm max-w-md" style={{ color: "#4B5563" }}>Two ways to get started with Cobalt.</p>
+                <div className="mt-4 w-full max-w-md grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+                  <div className="rounded-xl border-2 p-4 flex flex-col" style={{ borderColor: COBALT, background: "#F4F8FE" }}>
+                    <div className="text-[14px] font-bold" style={{ color: INK }}>Map your impact</div>
+                    <p className="mt-1 text-[12px] leading-snug flex-1" style={{ color: "#4B5563" }}>A free, 10-minute guided conversation. Walk away with a draft impact model and a measurement plan.</p>
+                    <button onClick={() => setLandingView("gate")} className="mt-3 px-4 py-2 rounded-xl text-white text-sm font-semibold" style={{ background: COBALT }}>Start →</button>
+                  </div>
+                  <div className="rounded-xl border-2 border-slate-200 p-4 flex flex-col">
+                    <div className="text-[14px] font-bold" style={{ color: INK }}>Stay in the loop</div>
+                    <p className="mt-1 text-[12px] leading-snug flex-1" style={{ color: "#4B5563" }}>Occasional updates, tools, and resources from Cobalt.</p>
+                    <button onClick={() => setLandingView("subscribe")} className="mt-3 px-4 py-2 rounded-xl text-sm font-semibold border" style={{ color: COBALT, borderColor: "#BFDBFE", background: "white" }}>Subscribe</button>
+                  </div>
+                </div>
+                <button onClick={() => setLandingView("message")} className="mt-4 text-[12px] underline" style={{ color: COBALT }}>
+                  Have a question? Send us a message →
                 </button>
-              </div>
-            ) : (
-              <div className="mt-4 w-full max-w-xs flex flex-col items-stretch gap-2.5">
-                <p className="text-[12px]" style={{ color: "#6B7280" }}>
-                  We emailed a 6-digit code to <span style={{ color: INK, fontWeight: 600 }}>{emailInput.trim()}</span>.
-                </p>
-                <input
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={codeInput}
-                  onChange={(e) => setCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  onKeyDown={(e) => { if (e.key === "Enter") submitCode(); }}
-                  placeholder="------"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-center text-[18px] tracking-[0.4em] focus:outline-none focus:ring-2"
-                  style={{ color: INK }}
-                />
-                {devCode && (
-                  <p className="text-[11px]" style={{ color: "#9CA3AF" }}>dev: code is {devCode}</p>
-                )}
-                <button
-                  onClick={submitCode}
-                  disabled={!/^\d{6}$/.test(codeInput) || gateBusy}
-                  className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-40"
-                  style={{ background: COBALT }}
-                >
-                  {gateBusy ? "Verifying…" : "Verify & start →"}
-                </button>
-                <button
-                  onClick={() => { setGateStep("form"); setCodeInput(""); setDevCode(""); setGateError(""); }}
-                  className="text-[11px] underline"
-                  style={{ color: "#9CA3AF" }}
-                >
-                  ← Use a different email / resend
-                </button>
-              </div>
+              </>
             )}
-            {gateError && <p className="mt-3 text-[12px]" style={{ color: AMBER }}>{gateError}</p>}
+            {(landingView === "subscribe" || landingView === "message") && (
+              <LeadForm
+                key={landingView}
+                type={landingView}
+                onBack={() => setLandingView("choose")}
+                onStartChat={() => setLandingView("gate")}
+              />
+            )}
+            {landingView === "gate" && (
+              <>
+                <p className="mt-3 text-sm max-w-md" style={{ color: "#4B5563" }}>
+                  Complete a free, 10-minute guided conversation designed for early-stage education, health, and workforce teams. Talk through how your solution works, and walk away with a plan you can keep, with no obligations.
+                </p>
+                <div className="mt-4 w-full max-w-sm text-left rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: COBALT }}>What you'll walk away with</div>
+                  <ul className="space-y-1.5 text-[12px] leading-snug" style={{ color: "#4B5563" }}>
+                    <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>A draft impact model</span> — how your solution is designed to make good things happen.</li>
+                    <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>A prioritized measurement plan</span> — concrete steps to measure your impact and how each can help.</li>
+                    <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>A shareable summary</span> — a brief report to keep or send to your team, a funder, or a buyer.</li>
+                    <li>&bull; <span style={{ color: INK, fontWeight: 600 }}>The option to go deeper</span> — an invitation to speak with the Cobalt team to discuss how we can help.</li>
+
+                  </ul>
+                </div>
+                {gateStep === "form" ? (
+                  <div className="mt-4 w-full max-w-xs flex flex-col items-stretch gap-2.5">
+                    <p className="text-[11px]" style={{ color: "#9CA3AF" }}>Enter your details to begin — we'll email a 6-digit code to verify your address.</p>
+                    <input
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value)}
+                      placeholder="Your name or initials"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[14px] text-center focus:outline-none focus:ring-2"
+                      style={{ color: INK }}
+                    />
+                    <input
+                      type="email"
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") requestCode(); }}
+                      placeholder="you@organization.org"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[14px] text-center focus:outline-none focus:ring-2"
+                      style={{ color: INK }}
+                    />
+                    <label className="flex items-start gap-2 text-left text-[11px] leading-snug px-1" style={{ color: "#6B7280" }}>
+                      <input type="checkbox" checked={tosAccepted} onChange={(e) => setTosAccepted(e.target.checked)} className="mt-0.5" />
+                      <span>
+                        I agree to the <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: COBALT }}>Terms of Service</a> and <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: COBALT }}>Privacy Policy</a>, and confirm I am a human and not using automated tools.
+                      </span>
+                    </label>
+                    <button
+                      onClick={requestCode}
+                      disabled={!gateReady || gateBusy}
+                      className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-40"
+                      style={{ background: COBALT }}
+                    >
+                      {gateBusy ? "Sending…" : "Email me a code →"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-4 w-full max-w-xs flex flex-col items-stretch gap-2.5">
+                    <p className="text-[12px]" style={{ color: "#6B7280" }}>
+                      We emailed a 6-digit code to <span style={{ color: INK, fontWeight: 600 }}>{emailInput.trim()}</span>.
+                    </p>
+                    <input
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={codeInput}
+                      onChange={(e) => setCodeInput(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      onKeyDown={(e) => { if (e.key === "Enter") submitCode(); }}
+                      placeholder="------"
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-center text-[18px] tracking-[0.4em] focus:outline-none focus:ring-2"
+                      style={{ color: INK }}
+                    />
+                    {devCode && (
+                      <p className="text-[11px]" style={{ color: "#9CA3AF" }}>dev: code is {devCode}</p>
+                    )}
+                    <button
+                      onClick={submitCode}
+                      disabled={!/^\d{6}$/.test(codeInput) || gateBusy}
+                      className="px-6 py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-40"
+                      style={{ background: COBALT }}
+                    >
+                      {gateBusy ? "Verifying…" : "Verify & start →"}
+                    </button>
+                    <button
+                      onClick={() => { setGateStep("form"); setCodeInput(""); setDevCode(""); setGateError(""); }}
+                      className="text-[11px] underline"
+                      style={{ color: "#9CA3AF" }}
+                    >
+                      ← Use a different email / resend
+                    </button>
+                  </div>
+                )}
+                {gateError && <p className="mt-3 text-[12px]" style={{ color: AMBER }}>{gateError}</p>}
+                {gateStep === "form" && !directStart && (
+                  <button onClick={() => { setLandingView("choose"); setGateError(""); }} className="mt-3 text-[11px] underline" style={{ color: "#9CA3AF" }}>← Back</button>
+                )}
+              </>
+            )}
             {devMode && (
               <button
                 onClick={loadDevConversation}
