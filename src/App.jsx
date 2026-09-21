@@ -1321,10 +1321,9 @@ export default function App() {
         {!started ? (
           <div className="flex-1 overflow-y-auto flex flex-col items-center justify-start px-8 py-8 text-center">
             <CobaltLogo size={48} />
-            <h2 className="mt-4 text-xl font-bold leading-tight max-w-md" style={{ color: INK }}>Want to measure your solution's impact but not sure where to start?</h2>
+            <h2 className="mt-4 text-xl font-bold leading-tight max-w-md" style={{ color: INK }}>{landingView === "choose" ? "Get started" : "Want to measure your solution's impact but not sure where to start?"}</h2>
             {landingView === "choose" && (
               <>
-                <p className="mt-3 text-sm max-w-md" style={{ color: "#4B5563" }}>Two ways to get started with Cobalt.</p>
                 <div className="mt-4 w-full max-w-md grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
                   <div className="rounded-xl border-2 p-4 flex flex-col" style={{ borderColor: COBALT, background: "#F4F8FE" }}>
                     <div className="text-[14px] font-bold" style={{ color: INK }}>Map your impact</div>
