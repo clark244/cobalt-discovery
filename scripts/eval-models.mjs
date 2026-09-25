@@ -23,7 +23,7 @@
 //   raw/          Raw model outputs
 //   opps-blind.md + opps-key.json   (only with --opps)
 //
-// Rough cost: 11 transcripts × 3 models × 3 runs ≈ 100 calls ≈ $3–6.
+// Rough cost: 11 transcripts × 3 models × 3 runs ≈ 100 calls ≈ $3–4.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -37,10 +37,12 @@ const PRICES = {
   "claude-opus-5-5": [4, 20],
   "claude-opus-4-6": [5, 25],
 };
-// Models on the newer tokenizer (4.7+) use ~30% more tokens for the same text,
-// so production max_tokens would truncate the JSON. Scale the budget for them.
+// Newer models (4.7+) use ~30% more tokens for the same text AND think before
+// answering by default; the thinking counts against max_tokens. With production
+// limits, Sonnet 5 / Opus 5.5 ran out of room before (or while) writing the JSON.
+// Give them a generous ceiling — you're billed only for tokens actually used.
 const OLD_TOKENIZER = new Set(["claude-sonnet-4-6", "claude-sonnet-4-5", "claude-opus-4-6", "claude-opus-4-5"]);
-const NEW_TOKENIZER_HEADROOM = 1.4;
+const NEW_MODEL_MAX_TOKENS = 8000;
 
 const args = process.argv.slice(2);
 const flag = (name, dflt) => {
@@ -114,7 +116,7 @@ function loadCases(file) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function callClaude(model, promptId, userContent) {
   const base = MAX_TOKENS[promptId];
-  const max_tokens = OLD_TOKENIZER.has(model) ? base : Math.ceil(base * NEW_TOKENIZER_HEADROOM);
+  const max_tokens = OLD_TOKENIZER.has(model) ? base : Math.max(base, NEW_MODEL_MAX_TOKENS);
   const body = JSON.stringify({ model, max_tokens, system: PROMPTS[promptId], messages: [{ role: "user", content: userContent }] });
   for (let attempt = 0; ; attempt++) {
     const t0 = Date.now();
@@ -128,7 +130,8 @@ async function callClaude(model, promptId, userContent) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(`${model} ${res.status}: ${data?.error?.message || JSON.stringify(data)}`);
     const text = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
-    return { text, ms, stop: data.stop_reason, inTok: data.usage?.input_tokens || 0, outTok: data.usage?.output_tokens || 0, max_tokens };
+    const blocks = (data.content || []).map((b) => b.type).join("+");
+    return { text, ms, blocks, stop: data.stop_reason, inTok: data.usage?.input_tokens || 0, outTok: data.usage?.output_tokens || 0, max_tokens };
   }
 }
 
@@ -185,7 +188,7 @@ function summarize(model, rows, cases) {
   for (const d of [...INTEGER_DIMS]) {
     const per = cases.map((c) => new Set(ok.filter((r) => r.caseId === c.id).map((r) => r.scores[d])));
     const judged = per.filter((s) => s.size > 0);
-    consistency[d] = judged.length ? mean(judged.map((s) => (s.size === 1 ? 1 : 0))) : NaN;
+    consistency[d] = RUNS < 2 ? NaN : judged.length ? mean(judged.map((s) => (s.size === 1 ? 1 : 0))) : NaN;
   }
   const cost = rows.reduce((a, r) => a + ((r.inTok || 0) * PRICES[model]?.[0] + (r.outTok || 0) * PRICES[model]?.[1]) / 1e6, 0);
   return {
@@ -194,6 +197,7 @@ function summarize(model, rows, cases) {
     truncated: rows.filter((r) => r.stop === "max_tokens").length,
     errors: rows.filter((r) => r.error).length,
     latency: mean(rows.filter((r) => r.ms).map((r) => r.ms)) / 1000,
+    errorMsgs: [...new Set(rows.filter((r) => r.error).map((r) => r.error))],
     costPerCall: PRICES[model] ? cost / rows.length : NaN,
   };
 }
@@ -212,12 +216,14 @@ function renderSummary(sums, cases) {
     const x = s.stats[d];
     L.push(`| ${d} | ${s.model} | ${f2(x.mae)} | ${f2(x.bias)} | ${pct(x.exact)} | ${pct(x.within1)} | ${pct(x.bandAgree)} |`);
   }
-  L.push("", `## Run-to-run consistency`, "", `Share of transcripts where all ${RUNS} runs gave the identical score.`, "");
+  L.push("", `## Run-to-run consistency`, "", `Share of transcripts where all ${RUNS} runs gave the identical score${RUNS < 2 ? " (needs --runs 2 or more)" : ""}.`, "");
   L.push(`| Model | Clarity | Analytic | Data | Budget |`, `|---|---|---|---|---|`);
   for (const s of sums) L.push(`| ${s.model} | ${pct(s.consistency.clarity)} | ${pct(s.consistency.analyticSkill)} | ${pct(s.consistency.dataInfrastructure)} | ${pct(s.consistency.budget)} |`);
   L.push("", `## Reliability, speed, cost`, "");
   L.push(`| Model | Calls | Parsed | Truncated | Errors | Avg latency (s) | Cost / call |`, `|---|---|---|---|---|---|---|`);
-  for (const s of sums) L.push(`| ${s.model} | ${s.n} | ${s.parsed} | ${s.truncated} | ${s.errors} | ${s.latency.toFixed(1)} | ${isNaN(s.costPerCall) ? "—" : "$" + s.costPerCall.toFixed(3)} |`);
+  for (const s of sums) L.push(`| ${s.model} | ${s.n} | ${s.parsed} | ${s.truncated} | ${s.errors} | ${isNaN(s.latency) ? "—" : s.latency.toFixed(1)} | ${isNaN(s.costPerCall) ? "—" : "$" + s.costPerCall.toFixed(3)} |`);
+  const errs = sums.flatMap((s) => s.errorMsgs.map((e) => `- ${s.model}: ${e}`));
+  if (errs.length) L.push("", `**Errors:**`, "", ...errs);
   L.push("", `## Caveats`, "",
     `- ${cases.length} transcripts is small; a difference of one or two cases is noise.`,
     `- The manual rescores may have been made after seeing Sonnet 4.6's output, and the prompt was tuned on Sonnet 4.6 — both tilt toward the incumbent.`,
@@ -240,7 +246,7 @@ const results = await pool(jobs, CONCURRENCY, async ({ c, model, run }) => {
   const r = { caseId: c.id, reviewer: c.reviewer, model, run, manual: c.manual };
   try {
     const res = await callClaude(model, "model", `Discovery conversation:\n\n${c.transcript}\n\nProduce the model + maturity JSON.`);
-    Object.assign(r, { ms: res.ms, stop: res.stop, inTok: res.inTok, outTok: res.outTok });
+    Object.assign(r, { ms: res.ms, blocks: res.blocks, stop: res.stop, inTok: res.inTok, outTok: res.outTok });
     fs.writeFileSync(path.join(outDir, "raw", `${c.id}__${model}__run${run}.txt`), res.text);
     try { r.json = parseJson(res.text); r.scores = extractScores(r.json); }
     catch (e) { r.error = `parse: ${e.message}${res.stop === "max_tokens" ? " (truncated)" : ""}`; }
@@ -252,8 +258,8 @@ const results = await pool(jobs, CONCURRENCY, async ({ c, model, run }) => {
 console.log("");
 
 // results.csv
-const header = ["case", "reviewer", "model", "run", ...DIMS.flatMap((d) => [`manual_${d}`, `model_${d}`]), "latency_s", "in_tok", "out_tok", "stop_reason", "error"];
-const csvRows = results.map((r) => [r.caseId, r.reviewer, r.model, r.run, ...DIMS.flatMap((d) => [r.manual[d], r.scores?.[d] ?? ""]), r.ms ? (r.ms / 1000).toFixed(1) : "", r.inTok ?? "", r.outTok ?? "", r.stop ?? "", r.error ?? ""]);
+const header = ["case", "reviewer", "model", "run", ...DIMS.flatMap((d) => [`manual_${d}`, `model_${d}`]), "latency_s", "in_tok", "out_tok", "stop_reason", "blocks", "error"];
+const csvRows = results.map((r) => [r.caseId, r.reviewer, r.model, r.run, ...DIMS.flatMap((d) => [r.manual[d], r.scores?.[d] ?? ""]), r.ms ? (r.ms / 1000).toFixed(1) : "", r.inTok ?? "", r.outTok ?? "", r.stop ?? "", r.blocks ?? "", r.error ?? ""]);
 fs.writeFileSync(path.join(outDir, "results.csv"), [header, ...csvRows].map((row) => row.map(csvCell).join(",")).join("\n"));
 
 const sums = MODELS.map((m) => summarize(m, results.filter((r) => r.model === m), cases));
