@@ -347,7 +347,7 @@ const CAPACITY_BANDS = {
 const AI_FLAG_LABELS = {
   0: "Not yet addressed",
   1: "Informal or safety-only checks",
-  2: "Regular checks, not yet tied to your model",
+  2: "Regular checks in place",
   3: "Checked against your model and expert judgment",
 };
 const AI_OUTPUT_TYPES = {
