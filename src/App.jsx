@@ -341,6 +341,61 @@ const CAPACITY_BANDS = {
   },
 };
 
+// AI-output check (2026-10). Founders see a plain-language label, never the 0-3
+// number; the number and the artifacts the founder says exist go only to the
+// Sheet ("AIOutput" tab) and the completion email, for meeting follow-up.
+const AI_FLAG_LABELS = {
+  0: "Not yet addressed",
+  1: "Informal or safety-only checks",
+  2: "Regular checks in place",
+  3: "Checked against your model and expert judgment",
+};
+const AI_OUTPUT_TYPES = {
+  score_classification: "Scores or classifications",
+  generative_interaction: "Generated dialogue, feedback, or content",
+  both: "Scores and generated content",
+};
+function normalizeAiOutput(a) {
+  if (!a || typeof a !== "object") return null;
+  const aiMediated = a.aiMediated === true;
+  const n = Number(a.flag);
+  const flag = aiMediated && Number.isInteger(n) && n >= 0 && n <= 3 ? n : null;
+  return {
+    aiMediated,
+    outputType: aiMediated && AI_OUTPUT_TYPES[a.outputType] ? a.outputType : "none",
+    outputDescription: aiMediated ? String(a.outputDescription || "") : "",
+    flag,
+    rationale: aiMediated ? String(a.rationale || "") : "",
+    artifactsClaimed: aiMediated && Array.isArray(a.artifactsClaimed) ? a.artifactsClaimed.map(String) : [],
+  };
+}
+const aiFlagColor = (flag) => (flag === 3 ? COBALT : flag === 2 ? AMBER : "#9CA3AF");
+function AiOutputCard({ ai }) {
+  if (!ai?.aiMediated || ai.flag == null) return null;
+  const c = aiFlagColor(ai.flag);
+  return (
+    <div className="rounded-xl border border-slate-200 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: INK }}>Checking your AI's output</div>
+        <span
+          className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border shrink-0"
+          style={{ color: c, borderColor: c + "55", background: c + "12" }}
+        >
+          {AI_FLAG_LABELS[ai.flag]}
+        </span>
+      </div>
+      <p className="text-[11px] mt-1" style={{ color: "#6B7280" }}>
+        {ai.outputDescription || AI_OUTPUT_TYPES[ai.outputType]}
+        {ai.outputDescription && AI_OUTPUT_TYPES[ai.outputType] ? ` · ${AI_OUTPUT_TYPES[ai.outputType]}` : ""}
+      </p>
+      {ai.rationale && <p className="text-xs leading-snug mt-1.5" style={{ color: "#4B5563" }}>{ai.rationale}</p>}
+      <p className="text-[11px] mt-2 italic" style={{ color: "#9CA3AF" }}>
+        When AI delivers part of your product, checking its output against what your model says it should do is how you know users are getting what it's designed to deliver. This reflects what you described, not a review of your checks — a read, not a score.
+      </p>
+    </div>
+  );
+}
+
 function Deliverable({ d, onEmailSubmit, messages = [] }) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState({ 0: true }); // which opportunity cards are open (screen-only); top card open by default
@@ -531,6 +586,19 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
       if (c.opportunity) { gap(1); text(`Opportunity: ${c.opportunity}`, margin + 8, { size: 8.5, color: COBALT_RGB, style: "italic", maxW: contentW - 8 }); }
     });
     gap(14);
+
+    // AI-output check (plain label only; the 0-3 number stays internal)
+    const ai = d.aiOutput;
+    if (ai?.aiMediated && ai.flag != null) {
+      ensureSpace(64);
+      text(`Checking your AI's output — ${AI_FLAG_LABELS[ai.flag]}`, margin, { size: 9.5, color: INK_RGB, style: "bold" });
+      const what = [ai.outputDescription, AI_OUTPUT_TYPES[ai.outputType]].filter(Boolean).join("  ·  ");
+      if (what) { gap(2); text(what, margin, { size: 8.5, color: GRAY_RGB }); }
+      if (ai.rationale) { gap(2); text(ai.rationale, margin, { size: 9, color: INK_RGB, lh: 1.4 }); }
+      gap(2);
+      text("Reflects what you described, not a review of your checks.", margin, { size: 8, color: GRAY_RGB, style: "italic" });
+      gap(14);
+    }
 
     // Evidence-demand fit
     if (d.evidence?.demandFit) {
@@ -780,6 +848,8 @@ function Deliverable({ d, onEmailSubmit, messages = [] }) {
           )}
         </div>
       </div>
+
+      <AiOutputCard ai={d.aiOutput} />
 
       {(d.evidence?.demandFit || d.evidence?.standard) && (
         <div className="rounded-xl border p-4" style={{ borderColor: "#BFDBFE", background: "#F8FAFF" }}>
@@ -1251,12 +1321,22 @@ export default function App() {
       );
       const modelPart = parseJson(modelRaw, "model");
       // Call 2: opportunities, grounded in the model + capacity scores from call 1 (keeps examples calibrated).
+      // Call 3 (in parallel with call 2): AI-output check — detects whether users receive
+      // AI output and flags how well the team checks it. Kept separate so it can't move the
+      // clarity/capacity scores, and best-effort: a failure here never blocks the report.
+      const aiOutputPromise = callClaude(
+        "aiOutput",
+        [{ role: "user", content: `Discovery conversation:\n\n${transcript}\n\nProduce the AI-output JSON.` }],
+      )
+        .then((raw) => normalizeAiOutput(parseJson(raw, "aiOutput")))
+        .catch((err) => { console.error("[generate] aiOutput failed:", err); return null; });
       const oppsRaw = await callClaude(
         "opps",
         [{ role: "user", content: `Discovery conversation:\n\n${transcript}\n\nDerived causal model and qualitative assessment:\n\n${JSON.stringify({ model: modelPart.model, assessment: modelPart.assessment, existingEvidence: modelPart.existingEvidence, dataFormNote: modelPart.dataFormNote })}\n\nProduce the opportunities JSON.` }],
       );
       const oppsPart = parseJson(oppsRaw, "opportunities");
-      const parsed = { ...modelPart, ...oppsPart };
+      const aiOutput = await aiOutputPromise;
+      const parsed = { ...modelPart, ...oppsPart, aiOutput };
       setDeliverable(parsed);
       setPhase(3); // Your results
       saveSession(parsed); // observability: log the full session for reviewer feedback

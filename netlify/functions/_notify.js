@@ -41,6 +41,18 @@ export async function sendCompletionEmail({
   const row = (label, val) =>
     `<tr><td style="padding:2px 12px 2px 0;color:#666">${label}</td><td>${val}</td></tr>`;
 
+  // AI-output check — internal view (0-3 flag + claimed artifacts for meeting follow-up).
+  const ai = m.aiOutput;
+  const aiRows = !ai
+    ? row("AI output", "<em>check failed or not run</em>")
+    : !ai.aiMediated
+      ? row("AI output", "Not AI-mediated")
+      : [
+          row("AI output", `${esc(ai.outputType)} — ${esc(ai.outputDescription)}`),
+          row("AI check flag", `${esc(ai.flag)} / 3 — ${esc(ai.rationale)}`),
+          row("Artifacts claimed", (ai.artifactsClaimed || []).length ? esc(ai.artifactsClaimed.join("; ")) : "<em>none mentioned</em>"),
+        ].join("");
+
   const subject = `New discovery completion — ${company}${reviewer ? ` (${reviewer})` : ""}`;
   const html = `
   <div style="font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:14px;color:#111">
@@ -51,6 +63,7 @@ export async function sendCompletionEmail({
       ${row("Name entered", esc(reviewer) || "<em>none</em>")}
       ${row("Clarity", esc(mat.clarity))}
       ${row("Capacity", esc(mat.capacity))}
+      ${aiRows}
       ${row("Messages", esc(messageCount))}
       ${row("Session ID", esc(sessionId))}
       ${row("IP", esc(ip))}

@@ -9,6 +9,7 @@
 //
 // The target sheet should have a header row:
 //   timestamp | sessionId | reviewer | messageCount | transcript | model_json | clarity | capacity | email
+// The AI-output check is written to a separate "AIOutput" tab (see below).
 
 import { google } from "googleapis";
 import { bump, clientIp } from "./_ratelimit.js";
@@ -148,6 +149,39 @@ export default async (req) => {
       insertDataOption: "INSERT_ROWS",
       requestBody: { values: [row] },
     });
+
+    // AI-output check (2026-10) → its own "AIOutput" tab, one row per session, so it
+    // never collides with Sheet1's app columns (A–I) or the manual-rescore columns.
+    // Best-effort: if the tab is missing, the session row above is already saved.
+    // AIOutput tab header: timestamp | sessionId | company | email | ai_mediated |
+    //   output_type | flag_0_3 | flag_label | rationale | artifacts_claimed
+    const ai = m.aiOutput;
+    if (ai && typeof ai === "object") {
+      const FLAG_LABELS = ["Not addressed", "Ad hoc or safety-only", "Systematic but generic", "Tied to ToC + human judgment"];
+      const arow = [
+        row[0],
+        body.sessionId || "",
+        m.company || "",
+        acct,
+        ai.aiMediated ? "yes" : "no",
+        ai.outputType || "",
+        ai.flag ?? "",
+        Number.isInteger(ai.flag) ? FLAG_LABELS[ai.flag] || "" : "",
+        ai.rationale || "",
+        Array.isArray(ai.artifactsClaimed) ? ai.artifactsClaimed.join("; ") : "",
+      ];
+      try {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: sheetId,
+          range: "AIOutput!A:J",
+          valueInputOption: "RAW",
+          insertDataOption: "INSERT_ROWS",
+          requestBody: { values: [arow] },
+        });
+      } catch (e) {
+        console.log("[save-session] AIOutput append failed (does the AIOutput tab exist?)", String(e));
+      }
+    }
 
     // Alert on every completed session (best-effort — never blocks the save).
     await sendCompletionEmail({
